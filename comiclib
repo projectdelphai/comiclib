@@ -7,7 +7,6 @@ require 'find'
 require 'fileutils'
 require 'optparse'
 
-
 @time = Time.new.strftime("%Y-%m-%d %H:%M:%S")
 trap("INT") do
 	exit 0
@@ -583,7 +582,7 @@ def maingui
 
 require 'green_shoes'
 
-	@options[:"mysqlpass"] =
+	@options[:"mysqlpass"] = ask("Please enter password:", :secret => true)
 	con = Mysql.new 'localhost', "#{@options[:"mysqluser"]}", "#{@options[:"mysqlpass"]}", 'comics'
 	
 	comics = con.query("SELECT Path FROM Titles WHERE MarkAsRead='No' ORDER BY Name ASC")
