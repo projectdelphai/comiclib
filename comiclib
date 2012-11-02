@@ -1,0 +1,693 @@
+#! /usr/bin/ruby
+
+require 'mysql'
+require 'highline/import'
+require 'yaml'
+require 'find'
+require 'fileutils'
+require 'optparse'
+
+
+@time = Time.new.strftime("%Y-%m-%d %H:%M:%S")
+trap("INT") do
+	exit 0
+end
+
+def firstrun
+	
+	
+	@@rootmysqlpass = ask("Enter your root password:  " ) { |q| q.echo = "*" }
+	mypass = ask("Enter your user password:  " ) { |q| q.echo = "*" }
+	con0 = Mysql.new 'localhost', "root", "#{@@rootmysqlpass}"
+	con0.query("CREATE DATABASE IF NOT EXISTS comics;")
+	con0.query("GRANT ALL ON COMICS.* to #{@options[:"mysqluser"]}@localhost IDENTIFIED BY '#{mypass}';")
+
+begin
+
+	titles=`find "#{@options[:"comicsdir"]}/" -type f | sed 's,#{@options[:"comicsdir"]}/,,'`
+	titles=titles.split(/\n/)
+	paths=`find "#{@options[:"comicsdir"]}/" -type f`
+	paths=paths.split(/\n/)
+	
+
+    con = Mysql.new 'localhost', "#{@options[:"mysqluser"]}", "#{mypass}", 'comics'
+
+	con.query("DROP TABLE IF EXISTS Titles")
+    con.query("CREATE TABLE IF NOT EXISTS \
+       Titles(ID INT PRIMARY KEY AUTO_INCREMENT, Name VARCHAR(100), Path VARCHAR(200), MarkAsRead VARCHAR(100))")
+	
+	titles.zip(paths).each { |title, path|
+		con.query("INSERT INTO Titles(Name, Path, MarkAsRead) VALUES('#{title}', '#{path}', 'No')")
+	}
+	
+
+	rescue Mysql::Error => e
+    puts e.errno
+    puts e.error
+    
+	ensure
+    con.close if con
+	end
+end
+
+
+@options = {
+	:comicsdir => nil,
+	:origdir => nil,
+	:mysqluser => nil,
+	:mysqlpass => nil,
+}
+
+@yml = File.join(ENV['HOME'],'/.comiclib/comiclib.yml')
+if File.directory?("#{Dir.home}/.comiclib/")
+	nil
+else
+	Dir.mkdir("#{Dir.home}/.comiclib/", 0700)
+end
+
+if File.exists? "#{Dir.home}/.comiclib/comiclib.yml"
+	config_options = YAML::load_file(@yml)
+	@options.merge!(config_options)
+else
+	File.open(@yml, 'w') { |file| YAML::dump(@options,file) }
+	STDERR.puts "Initialized config file in #{@yml}, please update with correct information and restart."
+	exit 0;
+end
+option_parser = OptionParser.new do |opts|
+	opts.on("--firstrun") do
+		firstrun
+	end
+	opts.on("-p PASSWORD") do |password|
+		@options[:mysqlpass] = password
+	end
+end
+option_parser.parse!
+
+def comiclist
+findcomics=`find #{@options[:"origdir"]}/ -maxdepth 1  -type f| sed 's,#{@options[:"origdir"]}/,,' | sort`
+File.open("#{Dir.home}/.comiclib/comiclib.txt", "w") {|f| f.write(findcomics) }
+
+@comics=[]  
+@extension=[]
+f = File.open("#{Dir.home}/.comiclib/comiclib.txt")
+
+f.each_line {|line|
+	if line.include? '.cbr'
+	@comics.push line
+	@extension.push '.cbr'
+	elsif line.include? '.cbz'
+	@comics.push line
+	@extension.push '.cbz'
+	else
+	nil
+	end
+}
+
+@comicsorig = Marshal.load( Marshal.dump(@comics) )
+end
+
+def comicsfilter
+@comics.each { |x|
+	y=x.match(/^[[a-zA-Z]*[\s_,-]*]*[#\s_0-9]*(.*)/)
+	x.gsub!($1, '').chomp!
+
+	x.gsub!(/.[Vv]./, '')
+	x.gsub!(/[_-]/, ' ')
+	x.gsub!("X Men", "X-Men")
+	x.gsub!("Spider Man", "Spider-Man")
+}
+
+@comicsti = Marshal.load( Marshal.dump(@comics) )
+@comictitles=@comics.collect { |x| 	x.split(/(?<=[a-zA-Z]).(?=[0-9])/)[0] }
+
+
+end
+
+def matchcomics
+@matches=[]
+@matchesdest=[]
+@emptymatches=[]
+@comictitles.each { |x|
+	match=`find #{@options[:"comicsdir"]} -maxdepth 2 -type d -name "#{x}"`
+	if match.empty? then
+	@emptymatches.push x
+	else
+	@matches.push x
+	@matchesdest.push match
+	end
+}
+end
+
+def matchfilter
+@matchesorigtitle=[]
+@matchesbk = Marshal.load( Marshal.dump(@matches) )
+
+@matches.zip(@comicsorig).each { |x, y|
+	if x.include? " " or x.include? "-"
+		x.gsub!(" ", ".").gsub!("-", ".")
+	else
+	nil
+	end
+	@matchesorig=y.match(/(#{x}.*)/)
+	@matchesorigtitle.push @matchesorig.to_s
+}
+@matchesti = Marshal.load( Marshal.dump(@matchesorigtitle) )
+
+
+@matchesti.each { |x|
+	if x.include? "_" or x.include? "-"
+		x.gsub!("_", " ")
+		x.gsub!("-", " ")
+	else
+	nil
+	end
+}
+
+@matchesti.each { |x|
+	y=x.match(/^[[a-zA-z]*[\s\-#]*]*[vV0-9][\s\-#]*[0-9]*/)
+	x.gsub!("#{x}", "#{y}")
+}
+
+end
+
+def movecomics
+i=0
+counter = @matches.size
+while i < counter do
+	begin
+	puts "TF will move #{@matchesti[i]} to #{@matchesdest[i]}"
+	File.open("#{Dir.home}/.comiclib/comiclib.log", "a") { |f| f.write("[#{@time}] tfo: Moved #{@matchesti[i]} to #{@matchesdest[i]}") }
+	if File.exists?("#{@options[:"origdir"]}/#{@matchesorigtitle[i]}")
+		FileUtils.mv "#{@options[:"origdir"]}/#{@matchesorigtitle[i]}", "#{@matchesdest[i].chomp}/#{@matchesti[i]}#{@extension[i]}", :verbose => true
+	else
+		puts "Error: all comics moved to folder #{@matchesdest[i-1].chomp}/#{@matchesti[i-1]}#{@extension[i-1]}"
+		exit 0;
+	end
+	rescue
+		puts "Error: #{@options[:"origdir"]}/#{@matchesorigtitle[i]} was not moved"
+	end
+	i += 1
+end
+end
+
+def createfolders
+	@emptymatches.each { |x|
+		FileUtils.mkdir "#{@options[:"comicsdir"]}/#{x}" unless File.exists? "#{@options[:"comicsdir"]}/#{x}"
+
+	}
+end
+
+def foldercomics
+if Dir["#{@options[:"origdir"]}/*"].empty?
+	puts "No comics to be organize or renamed"
+	exit 0;
+else nil end
+
+findcomics=`find #{@options[:"origdir"]}/ -maxdepth 2 -type f | sed -e "1d" | sed 's,#{@options[:"origdir"]}/,,' | sort`
+File.open("#{Dir.home}/.comiclib/comiclib.txt", "w") {|f| f.write(findcomics) }
+comics=[]
+
+f = File.open("#{Dir.home}/.comiclib/comiclib.txt")
+
+f.each_line {|line|
+	if line.include? '/'
+	comics.push "#{@options[:"origdir"]}/#{line}"
+	else
+	nil
+	end
+}
+comics.each { |x|
+	FileUtils.mv "#{x.chomp}", "#{@options[:"origdir"].chomp}/"
+}
+puts `find #{@options[:"origdir"]}/ -type d -empty -exec rmdir {} \\; 2> /dev/null`
+end
+
+def tfo
+foldercomics
+comiclist
+comicsfilter
+matchcomics
+createfolders
+matchcomics
+matchfilter
+movecomics
+main
+end
+
+def addcomics
+begin
+	titles=`find "#{@options[:"comicsdir"]}/" -name *.cb* -type f | sed 's,#{@options[:"comicsdir"]}/,,'`
+	titles=titles.split(/\n/)
+	paths=`find "#{@options[:"comicsdir"]}/" -name *.cb* -type f`
+	paths=paths.split(/\n/)
+
+    con = Mysql.new 'localhost', "#{@options[:"mysqluser"]}", "#{@options[:"mysqlpass"]}", 'comics'
+
+	titles.zip(paths).each { |titles, x|
+		match = con.query("SELECT Path From Titles WHERE Path='#{x}'")
+		
+		if match.num_rows == 0
+			con.query("INSERT INTO Titles(Name, Path, MarkAsRead) VALUES('#{titles}', '#{x}', 'No')")
+		else 
+		next
+		end		
+	}
+	
+rescue Mysql::Error => e
+    puts e.errno
+    puts e.error
+    
+ensure
+    con.close if con
+end
+tfrmenu
+end
+
+def startup
+	puts `clear`
+	if @options[:"mysqlpass"] == nil
+	@options[:"mysqlpass"] = ask("Enter your user password:  " ) { |q| q.echo = "*" }
+	else
+	nil
+	end
+	puts `clear`
+	puts "Scanning for new comics"
+	addcomics
+end
+
+def markasread(id)
+
+con = Mysql.new 'localhost', "#{@options[:"mysqluser"]}", "#{@options[:"mysqlpass"]}", 'comics'
+
+puts "Mark As Read? Y/N"
+input = gets.chomp
+if input == "Y"
+query = con.query("UPDATE Titles SET MarkAsRead = 'Yes' WHERE ID = #{id} ")
+elsif input == "N"
+nil
+else
+markasread
+end
+tfrmenu
+end
+
+def readcomic
+puts  "Which comic do you want to read?"
+id = gets.chomp
+if id == "b"
+tfrmenu
+else
+con = Mysql.new 'localhost', "#{@options[:"mysqluser"]}", "#{@options[:"mysqlpass"]}", 'comics'
+
+t1 = con.query("SELECT Path FROM Titles WHERE ID IN (#{id})")
+t1.each_hash do |row|
+	row=row.to_s.gsub!( "{\"Path\"=>", "").gsub!( "}", "")
+	`rc #{row} 2> /dev/null`
+end
+t2 = con.query("SELECT MarkAsRead FROM Titles WHERE ID IN (#{id})")
+t2.each_hash do |row|
+	row=row.to_s.gsub!( "{\"MarkAsRead\"=>\"", "").gsub!( "\"}", "")
+	if row == "No"
+	markasread(id)
+	else
+	nil
+	end
+end
+sleep 2
+tfrmenu
+end
+end
+
+def searchcomic
+con = Mysql.new 'localhost', "#{@options[:"mysqluser"]}", "#{@options[:"mysqlpass"]}", 'comics'
+`clear`
+puts "What comic do you want to read?"
+comicsearch = gets.chomp
+if comicsearch == "b"
+tfrmenu
+else
+searchquery = con.query("SELECT * FROM Titles WHERE Name LIKE '%#{comicsearch}%' ")
+matches=[]
+searchquery.each_hash { |row|
+	matches.push row['ID'] + " " + row['Name']
+}
+puts matches
+readcomic
+end
+end
+
+def displayunreadcomics
+	con = Mysql.new 'localhost', "#{@options[:"mysqluser"]}", "#{@options[:"mysqlpass"]}", 'comics'
+	
+	comics = con.query("SELECT ID, Name FROM Titles WHERE MarkAsRead='No' ORDER BY Name ASC")
+	
+	matches=[]
+	comics.each_hash { |row|
+		matches.push row['ID'] + " " + row['Name']
+	}
+	puts matches
+	readcomic
+end
+
+def deletecomic
+	con = Mysql.new 'localhost', "#{@options[:"mysqluser"]}", "#{@options[:"mysqlpass"]}", 'comics'
+	`clear`
+	puts "What comic do you want to remove from library?"
+	comicsearch = gets.chomp
+	if comicsearch == "b"
+	tfrmenu
+	else
+	searchquery = con.query("SELECT * FROM Titles WHERE Name LIKE '%#{comicsearch}%' ")
+	matches=[]
+	searchquery.each_hash { |row|
+		matches.push row['ID'] + " " + row['Name']
+	}
+	puts matches
+	puts  "Which comic do you want to remove?"
+	id = gets.chomp
+	confirm = ask("WARNING: This will remove the file as well. Continue? Y/N")
+	if confirm.chomp == "Y"
+		path = con.query("SELECT Path FROM Titles WHERE ID='#{id}'")
+		path.each { |x|
+			puts `rm "#{x.to_s.gsub!("[\"", "").gsub!("\"]", "")}"`
+			File.open("#{Dir.home}/.comiclib/comiclib.log", "a") { |f| f.write("[#{@time}] tfr: Removed from Library - #{x}") }
+		}
+		con.query("DELETE FROM Titles WHERE ID='#{id}'")
+		puts "comic deleted"
+		sleep 5
+	else
+	nil
+	end
+	tfrmenu
+	end
+end
+
+def cleanlibrary
+	titles=`find "#{@options[:"comicsdir"]}/" -name *.cb* -type f | sed 's,#{@options[:"comicsdir"]}/,,'`
+	titles=titles.split(/\n/)
+	
+	con = Mysql.new 'localhost', "#{@options[:"mysqluser"]}", "#{@options[:"mysqlpass"]}", 'comics'
+	
+	comics = con.query("SELECT Name FROM Titles")
+	comictitles=[]
+	comics.each { |x|
+		comictitles.push x.to_s.gsub!("[\"", "").gsub!("\"]", "")
+	}
+	
+	a = titles
+	b = comictitles
+	nomatches = (a | b) - (a & b)
+	nomatches.each { |x|
+		puts "#{x} - CLEANED"
+		File.open("#{Dir.home}/.comiclib/comiclib.log", "a") { |f| f.write("[#{@time}] tfr: Removed from Library - #{x}") }
+		con.query("DELETE FROM Titles WHERE Name='#{x}'")		
+	}
+	puts "#{nomatches.size} ITEMS WERE REMOVED LIBRARY"
+	puts "Alphabetizing Entries. . ."
+	con.query("CREATE TABLE Titles2 (SELECT * FROM Titles ORDER BY Name)")
+	con.query("DROP TABLE Titles;")
+	con.query("RENAME TABLE Titles2 TO Titles")
+	puts "Reordering IDs. . ."
+	con.query("ALTER TABLE Titles DROP COLUMN ID")
+	con.query("ALTER TABLE Titles ADD COLUMN ID INTEGER AUTO_INCREMENT PRIMARY KEY FIRST")
+	emptyfolders = `find #{@options[:"comicsdir"]} -type d -empty`.split(/\n/)
+	emptyfolders.each { |x|
+		puts `rmdir "#{x}"`
+		puts "Removed empty folder: #{x}"
+	}
+	comics2 = con.query("SELECT Path FROM Titles WHERE MarkAsRead='No'")
+	unread=[]
+	comics2.each { |x|
+		unread.push x.to_s.gsub!("[\"", "").gsub!("\"]", "")
+	}
+	jpgs=[]
+	unread.each { |x|
+		jpgs.push x if x.end_with?('.jpg')		
+	}
+	if jpgs.size >= 1
+		jpgs.each { |x|
+			con.query("DELETE FROM Titles WHERE Path='#{x}'")
+		}
+	else
+	nil
+	end
+	puts "Library cleaned"
+	sleep 4
+	tfrmenu	
+end
+
+def tfrmenu
+	puts `clear`
+	puts "Please pick an option\n1. Read Unread Comics \n2. Read Comic \n3. Delete Comic \n4. Scan Comics \n5. Clean Library"
+	case gets.strip
+	when "1"
+	displayunreadcomics
+	when "2"
+	searchcomic
+	when "3"
+	deletecomic
+	when "4"
+	startup
+	when "5"
+	cleanlibrary
+	when "b"
+	main
+	else
+	tfrmenu
+	end
+end
+
+def tfr
+startup
+end
+
+def coverart(nc)
+puts nc.size
+jpgsfull=[]
+	jpgs=[]
+	nc.each { |x|
+		if x.end_with?('.cbr')
+			jpgsfull.push `unrar vb "#{x}" 2> /dev/null | sort | grep .jpg | head -n 1`
+			jpgs.push `unrar lb "#{x}" 2> /dev/null | sort | grep .jpg | head -n 1`
+		elsif x.end_with?('.cbz')
+			jpgsfull.push `unzip -qqv "#{x}" 2> /dev/null | awk '{print $NF}' | sort | head -n 1`.chomp
+			jpgs.push `unzip -qql "#{x}" 2> /dev/null | awk '{print $NF}' | sort | head -n 1`.chomp
+		else
+		nil
+		end
+	}
+	puts jpgsfull
+	puts jpgs
+	puts jpgsfull.size
+	puts jpgs.size
+	nc.zip(jpgsfull, jpgs) { |x,y,z|
+		if x.end_with?('.cbr')
+			dirname=`dirname "#{x}"`
+			puts "starting with #{x.chomp}"
+			puts `unrar x -ep "#{x.chomp}" "#{y.chomp}" "#{dirname.chomp}/" 1> /dev/null`
+			puts `mv "#{dirname.chomp}/#{z.chomp}" "#{x.chomp.gsub('.cbr', '.jpg')}" 2> /dev/null`
+		elsif x.end_with?('cbz')
+			dirname=`dirname "#{x}"`
+			puts `unzip "#{x}" "#{y}" "#{dirname}/"`
+			puts `mv "#{y}" "#{x.gsub('.cbz', '.jpg')}"`
+		else
+			nil
+		end
+		sleep 1;
+	}
+end
+
+def infogui(i,c,images,matches,path,cover,comicsdir,password,user)
+
+	Shoes.app :width => 642, :height => 487 do 
+		stack do
+			tagline path.gsub(/^#{comicsdir.gsub('/', '\/')}\/[a-zA-Z\s\S]*\//, ''), align: 'center', margin_top: 15
+		end
+		stack :width => 245 do
+			flow :width => 245 do
+			
+				image = image cover, top: '15', width: 230.4, height: 354, margin_top: 40, margin_left: 15
+			end
+		end
+		stack :width => 375 do
+			flow do			
+				@mar = button "Mark As Read", margin_top: 40, margin_left: 15
+				@mar.click do
+					con = Mysql.new 'localhost', "#{user}", "#{password}", 'comics'
+					
+					con.query("UPDATE Titles SET MarkAsRead = 'Yes' WHERE Path='#{path}' ")
+					
+				end
+				button("Close", margin_top: 40, margin_left: 10){close}
+				
+			end
+			flow do
+				para "Info:  Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ante enim, porta sed dapibus iaculis, vulputate eu augue. Proin sem libero, sodales in ornare sit amet, aliquet eleifend ligula. Donec tincidunt, nibh at accumsan dapibus, enim nisi porttitor purus, vel porttitor lorem augue et dui. Pellentesque eros felis, bibendum porttitor rhoncus nec, iaculis vel ligula. Sed eu mauris velit, at scelerisque quam. Etiam tempor risus quis elit lacinia non sollicitudin magna ullamcorper. Suspendisse fermentum mi faucibus enim pellentesque id interdum ipsum euismod. Nulla commodo est vitae urna gravida vitae auctor augue iaculis. Praesent et metus metus, at ultricies neque. ", margin_top: 15, margin_left: 15
+			end				
+		end
+	end
+end
+
+def drawcomics(i,c,images,matches,comicsdir,password,user)
+background black
+y=i
+i.upto(i+5) { |x|
+	if images[x] == nil
+	nil
+	else
+		flow :width => 415 do
+		if x == c
+		border white, :strokewidth => 1 unless c > y+5
+		else
+		nil
+		end
+			image = image images[x], width: 384, height: 590, margin: 15
+			
+			image.click do |y|
+				if y.inspect.to_i == 1
+					puts `rc "#{matches[x]}" 1> /dev/null`
+				elsif y.inspect.to_i == 2
+					puts "middle-click"
+				elsif y.inspect.to_i == 3
+					path = matches[x]
+					cover = images[x]
+					infogui(i,c,images,matches,path,cover,comicsdir,password,user)
+				else nil
+				end
+			end
+		end
+	end
+}
+end
+
+def optionsgui
+	Shoes.app :width => 642, :height => 487 do 
+		stack do
+			title "Preferences", align: 'center', margin_top: 15
+		end
+		stack do
+		border black, :strokewidth => 2
+			flow do
+			border blue, :strokewidth => 2
+				caption "Background Color:", align: 'center', margin: 15, width: 200
+				list_box :items => ["black", "white", "blue", "green", "yellow", "purple"], margin: 15, :choose => "black"
+			end
+			flow do
+			button("Close", margin: 15, margin_left: 300){close}
+			end
+		end
+	end
+end
+
+def maingui
+
+require 'green_shoes'
+
+	@options[:"mysqlpass"] =
+	con = Mysql.new 'localhost', "#{@options[:"mysqluser"]}", "#{@options[:"mysqlpass"]}", 'comics'
+	
+	comics = con.query("SELECT Path FROM Titles WHERE MarkAsRead='No' ORDER BY Name ASC")
+	
+	matches=[]
+	comics.each_hash { |row|
+		matches.push row['Path']
+	}
+	
+	nc=[]
+	matches.each { |x|
+		if File.exists?(x.gsub(/.cb./, '.jpg'))
+		nil
+		else
+		nc.push x
+		end
+	}
+	puts nc
+	puts nc.size
+	coverart(nc) if nc.size >= 1
+		
+	images=[]
+	matches.each { |x|
+		if x.end_with?('.cbr')
+		images.push x.gsub('.cbr', '.jpg')
+		elsif x.end_with?('.cbz')
+		images.push x.gsub('.cbz', '.jpg')
+		else
+		nil
+		end
+	}
+	comicsdir = @options[:"comicsdir"]
+	password = @options[:"mysqlpass"]
+	user = @options[:"mysqluser"]
+	mainapp = Shoes.app do
+		@flow = flow do
+		background black
+			i=0
+			c=0
+			drawcomics(i,c,images,matches,comicsdir,password,user)
+			
+			keypress do |k|
+				if k == "q"
+					exit
+				elsif k == "n"
+				i+=6 unless i+1 == images.size
+				c=i unless i+1 == images.size
+				@flow.clear { drawcomics(i,c,images,matches,comicsdir,password,user) }
+				elsif k == "p"
+				i-=6 unless i<=0
+				c=i unless i<=0
+				@flow.clear { drawcomics(i,c,images,matches,comicsdir,password,user) }
+				elsif k == "Right"
+				c+=1
+				@flow.clear { drawcomics(i,c,images,matches,comicsdir,password,user) }
+				elsif k == "Left"
+				c-=1
+				@flow.clear { drawcomics(i,c,images,matches,comicsdir,password,user) }
+				elsif k == "k"
+				c+=1
+				@flow.clear { drawcomics(i,c,images,matches,comicsdir,password,user) }
+				elsif k == "j"
+				c-=1
+				@flow.clear { drawcomics(i,c,images,matches,comicsdir,password,user) }
+				elsif k == "i"
+				path=matches[c]
+				cover=images[c]
+				infogui(i,c,images,matches,path,cover,comicsdir,password,user)
+				elsif k == "o"
+				optionsgui
+				elsif k == "r"
+				@flow.clear { drawcomics(i,c,images,matches,comicsdir,password,user) }
+				elsif k == "\n"
+				puts `rc "#{matches[c]}" 1> /dev/null`
+				else
+				nil
+				end
+			end			
+		end
+	end
+	
+end
+
+def main
+	puts `clear`
+	puts "Please pick an option \n1. Read Comics \n2. Organize/Rename Comics"
+	case gets.strip
+	when "1"
+	require 'mysql'
+	tfr
+	when "2"
+	tfo
+	end
+end	
+
+command = ARGV.shift
+case command
+when 'tfr'
+require 'mysql'
+tfr
+when 'tfo'
+tfo 
+when 'maingui'
+maingui
+else
+main
+end

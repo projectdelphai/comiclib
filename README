@@ -1,0 +1,88 @@
+	README
+			
+
+*******************************************
+	ABOUT
+*******************************************
+comiclib - by Reuben Castelino (projectdelphai@gmail.com)
+Written in Ruby, this program is meant to be a lightweight and fast comic organizer and reader
+The first part of it (tfo) will organize, rename, and move all comics to a designated folder. The 
+second part (tfr) will scan all the titles, add it to a database, and allows you to read them using
+sxiv, a lightweight image viewer following vim shortcuts.
+	
+*******************************************
+	SETUP
+*******************************************
+
+1. The mysql daemon must be started before the comiclib reader can be used.
+3. To use comiclib reader for the first time, ONLY on the first time run it as "comiclib --firstrun"
+4. Config folder settings
+  * all configs follow this format => :SETTING: VALUE
+  * all paths do NOT end with a forward slash
+  a. comicsdir - Overall library path, contains all comics
+  b. origdir - Source directory of unsorted comics
+  . mysqluser - user account name
+  d. mysqlpass - user account password
+		* This is the only config that can be left blank
+5. tfo should be considered experimental and there might be exceptions that break the moving process. 
+    * Be forewarned that multiple files can be moved at once and will need tracking down. Any tfo processing
+	  should be done under supervision and not under a cron job until stable.
+
+*******************************************
+	FUTURE PLANS
+*******************************************
+
+* reload on markasread
+* optionsgui
+* comicvine synopsis in info window
+* test for deployment on other systems
+* add better error messages 
+	* for wrong mysql password
+* Add a rename only config
+* add developer configurations
+
+*******************************************
+	CHANGELOG
+*******************************************
+
+0.0.4
+* added basic gui using green shoes
+* options menu to mark as read and view cover and title
+* back and forward shortcuts to view all unread comics
+* library cleaner upgrade (checks for jpg in database)
+* create cover art for all comics in unread
+* added mark as read button
+* cli: "b" during any menu will go back up one level
+* gui: "n" will go to next page of comics, "p" will go back, "i" will display info on highlighted comics,
+	Left/Right (j/k) arrow key will highlist respective comic
+		
+
+0.0.3-1
+* added support for .cbz files
+* checks if origdir is empty or not
+* added error message for when all comics are moved to one folder
+
+0.0.3
+* removes deleted comics from database
+* added times in logs
+* logs library cleaning and comic moving
+* clean library also alphabetizes and reorders comics
+* can now manually delete comics
+
+0.0.2
+* added password switch
+* packaged for arch linux
+* if not exists, creates .comiclib directory
+
+0.0.1
+* combined tfo/tfr
+* added tfo/tfr switches
+* added switch for tfr firstrun
+* add main menu if no switch
+* creates custom yml if not existing
+
+*******************************************
+	DEV REMINDERS
+*******************************************
+
+* need to add dev production later
