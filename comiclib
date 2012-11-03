@@ -496,35 +496,16 @@ jpgsfull=[]
 	}
 end
 
-def infogui(i,c,images,matches,path,cover,comicsdir,password,user)
-
-	Shoes.app :width => 642, :height => 487 do 
-		stack do
-			tagline path.gsub(/^#{comicsdir.gsub('/', '\/')}\/[a-zA-Z\s\S]*\//, ''), align: 'center', margin_top: 15
-		end
-		stack :width => 245 do
-			flow :width => 245 do
-			
-				image = image cover, top: '15', width: 230.4, height: 354, margin_top: 40, margin_left: 15
-			end
-		end
-		stack :width => 375 do
-			flow do			
-				@mar = button "Mark As Read", margin_top: 40, margin_left: 15
-				@mar.click do
-					con = Mysql.new 'localhost', "#{user}", "#{password}", 'comics'
-					
-					con.query("UPDATE Titles SET MarkAsRead = 'Yes' WHERE Path='#{path}' ")
-					
-				end
-				button("Close", margin_top: 40, margin_left: 10){close}
-				
-			end
-			flow do
-				para "Info:  Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ante enim, porta sed dapibus iaculis, vulputate eu augue. Proin sem libero, sodales in ornare sit amet, aliquet eleifend ligula. Donec tincidunt, nibh at accumsan dapibus, enim nisi porttitor purus, vel porttitor lorem augue et dui. Pellentesque eros felis, bibendum porttitor rhoncus nec, iaculis vel ligula. Sed eu mauris velit, at scelerisque quam. Etiam tempor risus quis elit lacinia non sollicitudin magna ullamcorper. Suspendisse fermentum mi faucibus enim pellentesque id interdum ipsum euismod. Nulla commodo est vitae urna gravida vitae auctor augue iaculis. Praesent et metus metus, at ultricies neque. ", margin_top: 15, margin_left: 15
-			end				
-		end
-	end
+def matches(user,password)
+	con = Mysql.new 'localhost', "#{user}", "#{password}", 'comics'
+	
+	comics = con.query("SELECT Path FROM Titles WHERE MarkAsRead='No' ORDER BY Name ASC")
+	
+	matches=[]
+	comics.each_hash { |row|
+		matches.push row['Path']
+	}
+	return matches
 end
 
 def drawcomics(i,c,images,matches,comicsdir,password,user)
@@ -535,11 +516,8 @@ i.upto(i+5) { |x|
 	nil
 	else
 		flow :width => 415 do
-		if x == c
-		border white, :strokewidth => 1 unless c > y+5
-		else
-		nil
-		end
+		border white, :strokewidth => 1 if x == c unless c > y+5
+		
 			image = image images[x], width: 384, height: 590, margin: 15
 			
 			image.click do |y|
@@ -559,8 +537,52 @@ i.upto(i+5) { |x|
 }
 end
 
+def reload(i,c,comicsdir,user,password)
+matches = matches(user,password)
+images=[]
+matches.each { |x|
+	if x.end_with?('.cbr')
+	images.push x.gsub('.cbr', '.jpg')
+	elsif x.end_with?('.cbz')
+	images.push x.gsub('.cbz', '.jpg')
+	else
+	nil
+	end
+}
+@flow.clear { drawcomics(i,c,images,matches,comicsdir,password,user) }
+end
+
+def infogui(i,c,images,matches,path,cover,comicsdir,password,user)
+	window :width => 642, :height => 487, :title => "Info" do 
+		stack do
+			tagline path.gsub(/^#{comicsdir.gsub('/', '\/')}\/[a-zA-Z\s\S]*\//, ''), align: 'center', margin_top: 15
+		end
+		stack :width => 245 do
+			flow :width => 245 do
+			
+				image = image cover, top: '15', width: 230.4, height: 354, margin_top: 40, margin_left: 15
+			end
+		end
+		stack :width => 375 do
+			flow do			
+				@mar = button "Mark As Read", margin_top: 40, margin_left: 15
+				@mar.click do
+					con = Mysql.new 'localhost', "#{user}", "#{password}", 'comics'
+					
+					con.query("UPDATE Titles SET MarkAsRead = 'Yes' WHERE Path='#{path}' ")
+				end
+				button("Close", margin_top: 40, margin_left: 10){close}
+				
+			end
+			flow do
+				para "Info:  Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ante enim, porta sed dapibus iaculis, vulputate eu augue. Proin sem libero, sodales in ornare sit amet, aliquet eleifend ligula. Donec tincidunt, nibh at accumsan dapibus, enim nisi porttitor purus, vel porttitor lorem augue et dui. Pellentesque eros felis, bibendum porttitor rhoncus nec, iaculis vel ligula. Sed eu mauris velit, at scelerisque quam. Etiam tempor risus quis elit lacinia non sollicitudin magna ullamcorper. Suspendisse fermentum mi faucibus enim pellentesque id interdum ipsum euismod. Nulla commodo est vitae urna gravida vitae auctor augue iaculis. Praesent et metus metus, at ultricies neque. ", margin_top: 15, margin_left: 15
+			end				
+		end
+	end
+end
+
 def optionsgui
-	Shoes.app :width => 642, :height => 487 do 
+	Shoes.app :width => 642, :height => 487, :title => "options" do 
 		stack do
 			title "Preferences", align: 'center', margin_top: 15
 		end
@@ -583,14 +605,12 @@ def maingui
 require 'green_shoes'
 
 	@options[:"mysqlpass"] = ask("Please enter password:", :secret => true)
-	con = Mysql.new 'localhost', "#{@options[:"mysqluser"]}", "#{@options[:"mysqlpass"]}", 'comics'
+
+	comicsdir = @options[:"comicsdir"]
+	password = @options[:"mysqlpass"]
+	user = @options[:"mysqluser"]
 	
-	comics = con.query("SELECT Path FROM Titles WHERE MarkAsRead='No' ORDER BY Name ASC")
-	
-	matches=[]
-	comics.each_hash { |row|
-		matches.push row['Path']
-	}
+	matches = matches(user,password)
 	
 	nc=[]
 	matches.each { |x|
@@ -600,8 +620,6 @@ require 'green_shoes'
 		nc.push x
 		end
 	}
-	puts nc
-	puts nc.size
 	coverart(nc) if nc.size >= 1
 		
 	images=[]
@@ -614,10 +632,9 @@ require 'green_shoes'
 		nil
 		end
 	}
-	comicsdir = @options[:"comicsdir"]
-	password = @options[:"mysqlpass"]
-	user = @options[:"mysqluser"]
-	mainapp = Shoes.app do
+	
+	Shoes.app :title => "comiclib" do
+		fullscreen = true
 		@flow = flow do
 		background black
 			i=0
@@ -637,16 +654,16 @@ require 'green_shoes'
 				@flow.clear { drawcomics(i,c,images,matches,comicsdir,password,user) }
 				elsif k == "Right"
 				c+=1
-				@flow.clear { drawcomics(i,c,images,matches,comicsdir,password,user) }
+				reload(i,c,comicsdir,user,password)
 				elsif k == "Left"
 				c-=1
-				@flow.clear { drawcomics(i,c,images,matches,comicsdir,password,user) }
+				reload(i,c,comicsdir,user,password)
 				elsif k == "k"
 				c+=1
-				@flow.clear { drawcomics(i,c,images,matches,comicsdir,password,user) }
+				reload(i,c,comicsdir,user,password)
 				elsif k == "j"
 				c-=1
-				@flow.clear { drawcomics(i,c,images,matches,comicsdir,password,user) }
+				reload(i,c,comicsdir,user,password)
 				elsif k == "i"
 				path=matches[c]
 				cover=images[c]
@@ -654,9 +671,9 @@ require 'green_shoes'
 				elsif k == "o"
 				optionsgui
 				elsif k == "r"
-				@flow.clear { drawcomics(i,c,images,matches,comicsdir,password,user) }
+				reload(i,c,comicsdir,user,password)
 				elsif k == "\n"
-				puts `rc "#{matches[c]}" 1> /dev/null`
+				puts `rc "#{matches[c]}"`
 				else
 				nil
 				end

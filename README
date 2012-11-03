@@ -32,10 +32,8 @@ sxiv, a lightweight image viewer following vim shortcuts.
 	FUTURE PLANS
 *******************************************
 
-* reload on markasread
 * optionsgui
 * comicvine synopsis in info window
-* test for deployment on other systems
 * add better error messages 
 	* for wrong mysql password
 * Add a rename only config
@@ -44,6 +42,10 @@ sxiv, a lightweight image viewer following vim shortcuts.
 *******************************************
 	CHANGELOG
 *******************************************
+
+0.0.4-1
+* added refreshing after marking a comic as read
+* manual refreshing shorcut: "r" (will refresh automatically however)
 
 0.0.4
 * added basic gui using green shoes
