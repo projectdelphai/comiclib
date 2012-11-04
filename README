@@ -33,7 +33,6 @@ sxiv, a lightweight image viewer following vim shortcuts.
 *******************************************
 
 * optionsgui
-* comicvine synopsis in info window
 * add better error messages 
 	* for wrong mysql password
 * Add a rename only config
@@ -42,10 +41,6 @@ sxiv, a lightweight image viewer following vim shortcuts.
 *******************************************
 	CHANGELOG
 *******************************************
-
-0.0.4-1
-* added refreshing after marking a comic as read
-* manual refreshing shorcut: "r" (will refresh automatically however)
 
 0.0.4
 * added basic gui using green shoes
@@ -57,6 +52,9 @@ sxiv, a lightweight image viewer following vim shortcuts.
 * cli: "b" during any menu will go back up one level
 * gui: "n" will go to next page of comics, "p" will go back, "i" will display info on highlighted comics,
 	Left/Right (j/k) arrow key will highlist respective comic
+* added refreshing after marking a comic as read
+* manual refreshing shorcut: "r" (will refresh automatically however)
+* added comicvine synopsis in info window
 		
 
 0.0.3-1

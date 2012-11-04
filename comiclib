@@ -6,6 +6,7 @@ require 'yaml'
 require 'find'
 require 'fileutils'
 require 'optparse'
+require 'httparty'
 
 @time = Time.new.strftime("%Y-%m-%d %H:%M:%S")
 trap("INT") do
@@ -475,10 +476,6 @@ jpgsfull=[]
 		nil
 		end
 	}
-	puts jpgsfull
-	puts jpgs
-	puts jpgsfull.size
-	puts jpgs.size
 	nc.zip(jpgsfull, jpgs) { |x,y,z|
 		if x.end_with?('.cbr')
 			dirname=`dirname "#{x}"`
@@ -575,7 +572,13 @@ def infogui(i,c,images,matches,path,cover,comicsdir,password,user)
 				
 			end
 			flow do
-				para "Info:  Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ante enim, porta sed dapibus iaculis, vulputate eu augue. Proin sem libero, sodales in ornare sit amet, aliquet eleifend ligula. Donec tincidunt, nibh at accumsan dapibus, enim nisi porttitor purus, vel porttitor lorem augue et dui. Pellentesque eros felis, bibendum porttitor rhoncus nec, iaculis vel ligula. Sed eu mauris velit, at scelerisque quam. Etiam tempor risus quis elit lacinia non sollicitudin magna ullamcorper. Suspendisse fermentum mi faucibus enim pellentesque id interdum ipsum euismod. Nulla commodo est vitae urna gravida vitae auctor augue iaculis. Praesent et metus metus, at ultricies neque. ", margin_top: 15, margin_left: 15
+				title = path.gsub!(/#{comicsdir}\/[a-zA-Z0-9\s\-]*\//, '').gsub!(/.cb./, '')
+				title = title.gsub('0', '')
+				title = title.gsub('#', '')
+				title = title.gsub('  ', ' ')
+				title = title.gsub(' ', '+')
+				urls = HTTParty.get("http://api.comicvine.com/search/?api_key=86105e0ab26cf7a2f329056bb027c5ca83095807&resources=issue&query=#{title}&format=json")
+				para "#{urls.body.match(/<p><i>([\w\s\-'!?.,#]*)<\/i>/)[1]}", margin_top: 15, margin_left: 15
 			end				
 		end
 	end
