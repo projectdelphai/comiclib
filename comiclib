@@ -564,6 +564,9 @@ def infogui(i,c,images,matches,path,cover,comicsdir,password,user)
 			flow do			
 				@mar = button "Mark As Read", margin_top: 40, margin_left: 15
 				@mar.click do
+					puts user
+					puts password
+					puts path
 					con = Mysql.new 'localhost', "#{user}", "#{password}", 'comics'
 					
 					con.query("UPDATE Titles SET MarkAsRead = 'Yes' WHERE Path='#{path}' ")
@@ -572,7 +575,7 @@ def infogui(i,c,images,matches,path,cover,comicsdir,password,user)
 				
 			end
 			flow do
-				title = path.gsub!(/#{comicsdir}\/[a-zA-Z0-9\s\-]*\//, '').gsub!(/.cb./, '')
+				title = path.gsub(/#{comicsdir}\/[a-zA-Z0-9\s\-]*\//, '').gsub!(/.cb./, '')
 				title = title.gsub('0', '')
 				title = title.gsub('#', '')
 				title = title.gsub('  ', ' ')
