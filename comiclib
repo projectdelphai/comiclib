@@ -519,7 +519,8 @@ i.upto(i+5) { |x|
 			
 			image.click do |y|
 				if y.inspect.to_i == 1
-					puts `rc "#{matches[x]}" 1> /dev/null`
+				#	puts `rc "#{matches[x]}" 1> /dev/null`
+					system "rc "#{matches[x]}" 1> /dev/null"k
 				elsif y.inspect.to_i == 2
 					puts "middle-click"
 				elsif y.inspect.to_i == 3
@@ -680,6 +681,7 @@ require 'green_shoes'
 				reload(i,c,comicsdir,user,password)
 				elsif k == "\n"
 				puts `rc "#{matches[c]}"`
+				GC.start
 				else
 				nil
 				end
