@@ -266,10 +266,17 @@ end
 
 def startup
 	puts `clear`
-	if @options[:"mysqlpass"] == nil
-	@options[:"mysqlpass"] = ask("Enter your user password:  " ) { |q| q.echo = "*" }
-	else
-	nil
+	test = "fail"
+	
+	until test == "pass" do 
+	passtest = ask("Enter your user password:  " ) { |q| q.echo = "*" } if @options[:"mysqlpass"] == nil
+	begin
+	con = Mysql.new 'localhost', "#{@options[:"mysqluser"]}", "#{passtest}", 'comics'
+	test = "pass"
+	@options[:"mysqlpass"] = passtest
+	rescue
+	puts "fail"
+	end
 	end
 	puts `clear`
 	puts "Scanning for new comics"
@@ -618,7 +625,20 @@ def maingui
 
 require 'green_shoes'
 	
-	@options[:"mysqlpass"] = ask("Please enter password:", :secret => true)
+	test = "fail"
+	until test == "pass" do
+
+	passtest = ask("Please enter password:", :secret => true)
+
+	begin
+	con = Mysql.new 'localhost', "#{@options[:"mysqluser"]}", "#{passtest}", 'comics'
+	test = "pass"
+	@options[:"mysqlpass"] = passtest
+	rescue
+	alert("Wrong Password, try again")
+	end
+
+	end
 
 	comicsdir = @options[:"comicsdir"]
 	password = @options[:"mysqlpass"]
