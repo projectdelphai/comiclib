@@ -555,7 +555,7 @@ matches.each { |x|
 end
 
 def infogui(i,c,images,matches,path,cover,comicsdir,password,user)
-	window :width => 642, :height => 487, :title => "Info" do 
+	Shoes.app :width => 642, :height => 487, :title => "Info" do 
 		stack do
 			tagline path.gsub(/^#{comicsdir.gsub('/', '\/')}\/[a-zA-Z\s\S]*\//, ''), align: 'center', margin_top: 15
 		end
@@ -583,7 +583,13 @@ def infogui(i,c,images,matches,path,cover,comicsdir,password,user)
 				title = title.gsub('  ', ' ')
 				title = title.gsub(' ', '+')
 				urls = HTTParty.get("http://api.comicvine.com/search/?api_key=86105e0ab26cf7a2f329056bb027c5ca83095807&resources=issue&query=#{title}&format=json")
-				para "#{urls.body.match(/<p><i>([\w\s\-'!?.,#]*)<\/i>/)[1]}", margin_top: 15, margin_left: 15
+				begin	
+				summary = urls.body.match(/<p><i>([\w\s\-'!?.,#]*)<\/i>/)[1]
+				para "#{summary}", margin_top: 15, margin_left: 15
+				rescue
+				para "Could not find summary", margin_top: 15, margin_left: 15	
+				end
+				para "Thanks to both the comicvine editors and the staff for the plot summary and for the comicvine api", margin_top: 30, margin_left: 15
 			end				
 		end
 	end

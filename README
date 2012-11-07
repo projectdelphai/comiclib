@@ -54,8 +54,10 @@ sxiv, a lightweight image viewer following vim shortcuts.
 	CHANGELOG
 *******************************************
 
-0.0.4-1
+0.0.4-2
 * lowered memory usage
+* fixed crash if there was no summary
+* added thanks to comicvine editors and staff
 
 0.0.4
 * added basic gui using green shoes
