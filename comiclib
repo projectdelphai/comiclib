@@ -1,5 +1,6 @@
 #! /usr/bin/ruby
 
+require 'benchmark'
 require 'mysql'
 require 'highline/import'
 require 'yaml'
@@ -475,6 +476,7 @@ jpgsfull=[]
 		else
 		nil
 		end
+		x=nil
 	}
 	nc.zip(jpgsfull, jpgs) { |x,y,z|
 		if x.end_with?('.cbr')
@@ -489,7 +491,7 @@ jpgsfull=[]
 		else
 			nil
 		end
-		sleep 1;
+		x,y,z=nil
 	}
 end
 
@@ -501,6 +503,7 @@ def matches(user,password)
 	matches=[]
 	comics.each_hash { |row|
 		matches.push row['Path']
+		row=nil
 	}
 	return matches
 end
@@ -519,8 +522,7 @@ i.upto(i+5) { |x|
 			
 			image.click do |y|
 				if y.inspect.to_i == 1
-				#	puts `rc "#{matches[x]}" 1> /dev/null`
-					system "rc "#{matches[x]}" 1> /dev/null"k
+					puts `rc "#{matches[x]}" 1> /dev/null`
 				elsif y.inspect.to_i == 2
 					puts "middle-click"
 				elsif y.inspect.to_i == 3
@@ -533,6 +535,7 @@ i.upto(i+5) { |x|
 		end
 	end
 }
+GC.start
 end
 
 def reload(i,c,comicsdir,user,password)
@@ -546,6 +549,7 @@ matches.each { |x|
 	else
 	nil
 	end
+	x=nil
 }
 @flow.clear { drawcomics(i,c,images,matches,comicsdir,password,user) }
 end
@@ -565,9 +569,6 @@ def infogui(i,c,images,matches,path,cover,comicsdir,password,user)
 			flow do			
 				@mar = button "Mark As Read", margin_top: 40, margin_left: 15
 				@mar.click do
-					puts user
-					puts password
-					puts path
 					con = Mysql.new 'localhost', "#{user}", "#{password}", 'comics'
 					
 					con.query("UPDATE Titles SET MarkAsRead = 'Yes' WHERE Path='#{path}' ")
@@ -610,7 +611,7 @@ end
 def maingui
 
 require 'green_shoes'
-
+	
 	@options[:"mysqlpass"] = ask("Please enter password:", :secret => true)
 
 	comicsdir = @options[:"comicsdir"]
@@ -626,9 +627,9 @@ require 'green_shoes'
 		else
 		nc.push x
 		end
+		x = nil
 	}
-	coverart(nc) if nc.size >= 1
-		
+	coverart(nc) if nc.size >= 1	
 	images=[]
 	matches.each { |x|
 		if x.end_with?('.cbr')
@@ -638,8 +639,8 @@ require 'green_shoes'
 		else
 		nil
 		end
+		x = nil
 	}
-	
 	Shoes.app :title => "comiclib" do
 		fullscreen = true
 		@flow = flow do
@@ -647,7 +648,6 @@ require 'green_shoes'
 			i=0
 			c=0
 			drawcomics(i,c,images,matches,comicsdir,password,user)
-			
 			keypress do |k|
 				if k == "q"
 					exit
@@ -659,18 +659,10 @@ require 'green_shoes'
 				i-=6 unless i<=0
 				c=i unless i<=0
 				@flow.clear { drawcomics(i,c,images,matches,comicsdir,password,user) }
-				elsif k == "Right"
-				c+=1
-				reload(i,c,comicsdir,user,password)
-				elsif k == "Left"
-				c-=1
-				reload(i,c,comicsdir,user,password)
-				elsif k == "k"
-				c+=1
-				reload(i,c,comicsdir,user,password)
-				elsif k == "j"
-				c-=1
-				reload(i,c,comicsdir,user,password)
+				elsif k == "Right" or k == "k"
+				reload(i,c+=1,comicsdir,user,password)
+				elsif k == "Left" or k == "j"
+				reload(i,c-=1,comicsdir,user,password)
 				elsif k == "i"
 				path=matches[c]
 				cover=images[c]

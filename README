@@ -14,6 +14,12 @@ sxiv, a lightweight image viewer following vim shortcuts.
 	SETUP
 *******************************************
 
+* Dependencies
+  * Gemfile
+  * Mysql
+  * atool
+  * sxiv
+
 1. The mysql daemon must be started before the comiclib reader can be used.
 3. To use comiclib reader for the first time, ONLY on the first time run it as "comiclib --firstrun"
 4. Config folder settings
@@ -39,8 +45,17 @@ sxiv, a lightweight image viewer following vim shortcuts.
 * add developer configurations
 
 *******************************************
+	KNOWN BUGS
+*******************************************
+* On arch systems, ruby-gtk2 will not install properly. You will have to manually install it with
+  "gem install gtk2"
+
+*******************************************
 	CHANGELOG
 *******************************************
+
+0.0.4-1
+* lowered memory usage
 
 0.0.4
 * added basic gui using green shoes
