@@ -470,7 +470,6 @@ startup
 end
 
 def coverart(nc)
-puts nc.size
 jpgsfull=[]
 	jpgs=[]
 	nc.each { |x|
@@ -483,7 +482,6 @@ jpgsfull=[]
 		else
 		nil
 		end
-		x=nil
 	}
 	nc.zip(jpgsfull, jpgs) { |x,y,z|
 		if x.end_with?('.cbr')
@@ -498,7 +496,6 @@ jpgsfull=[]
 		else
 			nil
 		end
-		x,y,z=nil
 	}
 end
 
@@ -510,7 +507,6 @@ def matches(user,password)
 	matches=[]
 	comics.each_hash { |row|
 		matches.push row['Path']
-		row=nil
 	}
 	return matches
 end
@@ -545,7 +541,7 @@ i.upto(i+5) { |x|
 GC.start
 end
 
-def reload(i,c,comicsdir,user,password)
+def reload(i,c,matches,comicsdir,user,password)
 matches = matches(user,password)
 images=[]
 matches.each { |x|
@@ -556,9 +552,9 @@ matches.each { |x|
 	else
 	nil
 	end
-	x=nil
 }
 @flow.clear { drawcomics(i,c,images,matches,comicsdir,password,user) }
+return matches;
 end
 
 def infogui(i,c,images,matches,path,cover,comicsdir,password,user)
@@ -629,7 +625,11 @@ require 'green_shoes'
 	until test == "pass" do
 
 	passtest = ask("Please enter password:", :secret => true)
-
+	
+	if passtest == nil
+	exit 0;	
+	else nil
+	end
 	begin
 	con = Mysql.new 'localhost', "#{@options[:"mysqluser"]}", "#{passtest}", 'comics'
 	test = "pass"
@@ -668,7 +668,7 @@ require 'green_shoes'
 		x = nil
 	}
 	Shoes.app :title => "comiclib" do
-		fullscreen = true
+		background black
 		@flow = flow do
 		background black
 			i=0
@@ -679,16 +679,20 @@ require 'green_shoes'
 					exit
 				elsif k == "n"
 				i+=6 unless i+1 == images.size
-				c=i unless i+1 == images.size
-				@flow.clear { drawcomics(i,c,images,matches,comicsdir,password,user) }
+				c=i 
+				#@flow.clear { drawcomics(i,c,images,matches,comicsdir,password,user) }
+				reload(i,c,matches,comicsdir,user,password)
 				elsif k == "p"
 				i-=6 unless i<=0
-				c=i unless i<=0
-				@flow.clear { drawcomics(i,c,images,matches,comicsdir,password,user) }
+				c=i 
+				#@flow.clear { drawcomics(i,c,images,matches,comicsdir,password,user) }
+				reload(i,c,matches,comicsdir,user,password)
 				elsif k == "Right" or k == "k"
-				reload(i,c+=1,comicsdir,user,password)
+				c+=1 unless c>=i+5
+				reload(i,c,matches,comicsdir,user,password)
 				elsif k == "Left" or k == "j"
-				reload(i,c-=1,comicsdir,user,password)
+				c-=1 unless c<=i
+				reload(i,c,matches,comicsdir,user,password)
 				elsif k == "i"
 				path=matches[c]
 				cover=images[c]
@@ -696,8 +700,9 @@ require 'green_shoes'
 				elsif k == "o"
 				optionsgui
 				elsif k == "r"
-				reload(i,c,comicsdir,user,password)
+				reload(i,c,matches,comicsdir,user,password)
 				elsif k == "\n"
+				matches = reload(i,c,matches,comicsdir,user,password)
 				puts `rc "#{matches[c]}"`
 				GC.start
 				else

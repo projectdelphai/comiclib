@@ -47,7 +47,7 @@ sxiv, a lightweight image viewer following vim shortcuts.
 *******************************************
 	KNOWN BUGS
 *******************************************
-* [FIXED] - On arch systems, ruby-gtk2 will not install properly. You will have to manually install it with
+* [KINDA-FIXED] - On arch systems, ruby-gtk2 will not install properly. You will have to manually install it with
   "gem install gtk2"
 
 *******************************************
@@ -60,6 +60,8 @@ sxiv, a lightweight image viewer following vim shortcuts.
 * added thanks to comicvine editors and staff
 * added checks for password, dropped support for yml password temporarily
 * fixed organizer for breaks on letter v (yeah, it was weird)
+* added proper reload after markasread
+* fixed being able to move offscreen
 
 0.0.4
 * added basic gui using green shoes
