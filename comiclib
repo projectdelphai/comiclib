@@ -112,7 +112,7 @@ def comicsfilter
 	y=x.match(/^[[a-zA-Z]*[\s_,-]*]*[#\s_0-9]*(.*)/)
 	x.gsub!($1, '').chomp!
 
-	x.gsub!(/.[Vv]./, '')
+	x.gsub!(/.[Vv][0-9]/, '')
 	x.gsub!(/[_-]/, ' ')
 	x.gsub!("X Men", "X-Men")
 	x.gsub!("Spider Man", "Spider-Man")
@@ -165,7 +165,7 @@ def matchfilter
 }
 
 @matchesti.each { |x|
-	y=x.match(/^[[a-zA-z]*[\s\-#]*]*[vV0-9][\s\-#]*[0-9]*/)
+	y=x.match(/^[[a-zA-Z]*[\s\-#]*]*[vV0-9][\s\-#]*[0-9]*/)
 	x.gsub!("#{x}", "#{y}")
 }
 

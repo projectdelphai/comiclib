@@ -29,7 +29,7 @@ sxiv, a lightweight image viewer following vim shortcuts.
   b. origdir - Source directory of unsorted comics
   . mysqluser - user account name
   d. mysqlpass - user account password
-		* This is the only config that can be left blank
+	* This is the only config that can be left blank
 5. tfo should be considered experimental and there might be exceptions that break the moving process. 
     * Be forewarned that multiple files can be moved at once and will need tracking down. Any tfo processing
 	  should be done under supervision and not under a cron job until stable.
@@ -47,7 +47,7 @@ sxiv, a lightweight image viewer following vim shortcuts.
 *******************************************
 	KNOWN BUGS
 *******************************************
-* On arch systems, ruby-gtk2 will not install properly. You will have to manually install it with
+* [FIXED] - On arch systems, ruby-gtk2 will not install properly. You will have to manually install it with
   "gem install gtk2"
 
 *******************************************
@@ -59,6 +59,7 @@ sxiv, a lightweight image viewer following vim shortcuts.
 * fixed crash if there was no summary
 * added thanks to comicvine editors and staff
 * added checks for password, dropped support for yml password temporarily
+* fixed organizer for breaks on letter v (yeah, it was weird)
 
 0.0.4
 * added basic gui using green shoes
