@@ -596,6 +596,7 @@ def infogui(i,c,images,matches,path,cover,comicsdir,password,user)
 			end				
 		end
 	end
+	GC.start
 end
 
 def optionsgui
@@ -615,6 +616,7 @@ def optionsgui
 			end
 		end
 	end
+	GC.start
 end
 
 def maingui
@@ -680,12 +682,10 @@ require 'green_shoes'
 				elsif k == "n"
 				i+=6 unless i+1 == images.size
 				c=i 
-				#@flow.clear { drawcomics(i,c,images,matches,comicsdir,password,user) }
 				reload(i,c,matches,comicsdir,user,password)
 				elsif k == "p"
 				i-=6 unless i<=0
 				c=i 
-				#@flow.clear { drawcomics(i,c,images,matches,comicsdir,password,user) }
 				reload(i,c,matches,comicsdir,user,password)
 				elsif k == "Right" or k == "k"
 				c+=1 unless c>=i+5
@@ -703,15 +703,16 @@ require 'green_shoes'
 				reload(i,c,matches,comicsdir,user,password)
 				elsif k == "\n"
 				matches = reload(i,c,matches,comicsdir,user,password)
-				puts `rc "#{matches[c]}"`
+				puts `rc "#{matches[c]}" 1> /dev/null`
 				GC.start
 				else
 				nil
 				end
 			end			
 		end
+		GC.start
 	end
-	
+	GC.start
 end
 
 def main

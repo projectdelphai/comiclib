@@ -4,7 +4,7 @@
 *******************************************
 	ABOUT
 *******************************************
-comiclib - by Reuben Castelino (projectdelphai@gmail.com)
+comiclib - projectdelphai@gmail.com
 Written in Ruby, this program is meant to be a lightweight and fast comic organizer and reader
 The first part of it (tfo) will organize, rename, and move all comics to a designated folder. The 
 second part (tfr) will scan all the titles, add it to a database, and allows you to read them using
@@ -49,7 +49,8 @@ sxiv, a lightweight image viewer following vim shortcuts.
 *******************************************
 * [KINDA-FIXED] - On arch systems, ruby-gtk2 will not install properly. You will have to manually install it with
   "gem install gtk2"
-
+* After a while of using the gui, the program will quit itself because of memory usage. Just restart. The command
+  line interface has no such problems
 *******************************************
 	CHANGELOG
 *******************************************
@@ -62,6 +63,7 @@ sxiv, a lightweight image viewer following vim shortcuts.
 * fixed organizer for breaks on letter v (yeah, it was weird)
 * added proper reload after markasread
 * fixed being able to move offscreen
+* can now exit password query
 
 0.0.4
 * added basic gui using green shoes
