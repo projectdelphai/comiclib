@@ -3,5 +3,5 @@ DIRECTORY="$1"
 if [ ! -d "$DIRECTORY" ]; then                                                   
    mkdir /tmp/"$DIRECTORY"                                                    
 fi                                                                               
-aunpack -X "/tmp/$DIRECTORY" "$1" 2> /dev/null && sxiv -r -f -Z -q "/tmp/$DIRECTORY"/*
+aunpack -X "/tmp/$DIRECTORY" "$1" > /dev/null 2>&1 && sxiv -r -f -Z -q "/tmp/$DIRECTORY"/*
 trap 'rm -r /tmp/"$DIRECTORY" 2> /dev/null' EXIT
