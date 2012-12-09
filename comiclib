@@ -678,7 +678,14 @@ require 'green_shoes'
 			drawcomics(i,c,images,matches,comicsdir,password,user)
 			keypress do |k|
 				if k == "q"
-					exit
+				local_variables.each do |var|
+				  puts "#{var} is #{var.class} "
+				end
+			#	GC.start
+			#	local_variables.each do |var|
+			#	  puts "#{var} is #{var.class} and is equal to #{eval(var).inspect}"
+			#	end
+				exit
 				elsif k == "n"
 				i+=6 unless i+1 == images.size
 				c=i 
