@@ -30,7 +30,7 @@ sxiv, a lightweight image viewer following vim shortcuts.
   . mysqluser - user account name
   d. mysqlpass - user account password
 	* This is the only config that can be left blank
-5. tfo should be considered experimental and there might be exceptions that break the moving process. 
+5. tfo (the file organizer) is now considered relatively stable though there might be exceptions that break the moving process. 
     * Be forewarned that multiple files can be moved at once and will need tracking down. Any tfo processing
 	  should be done under supervision and not under a cron job until stable.
 
@@ -51,9 +51,14 @@ sxiv, a lightweight image viewer following vim shortcuts.
   "gem install gtk2"
 * After a while of using the gui, the program will quit itself because of memory usage. Just restart. The command
   line interface has no such problems
+
 *******************************************
 	CHANGELOG
 *******************************************
+
+0.0.4-3
+* fixed scanning
+* edited so password failure doesn't create endless fail loop
 
 0.0.4-2
 * lowered memory usage

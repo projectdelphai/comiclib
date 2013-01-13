@@ -275,11 +275,10 @@ def startup
 	test = "pass"
 	@options[:"mysqlpass"] = passtest
 	rescue
-	puts "fail"
+	  puts "fail"
+	  exit 0
 	end
 	end
-	puts `clear`
-	puts "Scanning for new comics"
 	addcomics
 end
 
@@ -455,7 +454,7 @@ def tfrmenu
 	when "3"
 	deletecomic
 	when "4"
-	startup
+	addcomics	
 	when "5"
 	cleanlibrary
 	when "b"
@@ -678,14 +677,7 @@ require 'green_shoes'
 			drawcomics(i,c,images,matches,comicsdir,password,user)
 			keypress do |k|
 				if k == "q"
-				local_variables.each do |var|
-				  puts "#{var} is #{var.class} "
-				end
-			#	GC.start
-			#	local_variables.each do |var|
-			#	  puts "#{var} is #{var.class} and is equal to #{eval(var).inspect}"
-			#	end
-				exit
+					exit
 				elsif k == "n"
 				i+=6 unless i+1 == images.size
 				c=i 
