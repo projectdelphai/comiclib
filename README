@@ -1,60 +1,57 @@
-	README
-			
+comiclib
+================
 
-*******************************************
-	ABOUT
-*******************************************
+About
+---------------
 comiclib - projectdelphai@gmail.com
+
 Written in Ruby, this program is meant to be a lightweight and fast comic organizer and reader
 The first part of it (tfo) will organize, rename, and move all comics to a designated folder. The 
 second part (tfr) will scan all the titles, add it to a database, and allows you to read them using
 sxiv, a lightweight image viewer following vim shortcuts.
 	
-*******************************************
-	SETUP
-*******************************************
-
-* Dependencies
+Setup
+-----------
+1. Dependencies
   * Gemfile
-  * Mysql
+  * sqlite3
   * atool
   * sxiv
+2. When first run, ~/.comiclib and ~/.comiclib/config.yml is created. The config file should be filled out first.
+3. comiclib defaults to a main.db where the main library information is held. To create/use a new/different library specify it with -d <database name>. A new database file will be created at ~/.comiclib/<databasename>.db
+4. Config File Sample
+	---
+	main:
+	  :comicsdir: /path/to/all/comics
+	  :origdir: /path/to/unsorted/comics
+	
+	secondlibrary:
+	  :comicsdir: /same/thing/note/the
+	  :origdir: /lack/of/ending/slash
+5. The file organizer is relatively stable but should be used with caution just in case
 
-1. The mysql daemon must be started before the comiclib reader can be used.
-3. To use comiclib reader for the first time, ONLY on the first time run it as "comiclib --firstrun"
-4. Config folder settings
-  * all configs follow this format => :SETTING: VALUE
-  * all paths do NOT end with a forward slash
-  a. comicsdir - Overall library path, contains all comics
-  b. origdir - Source directory of unsorted comics
-  . mysqluser - user account name
-  d. mysqlpass - user account password
-	* This is the only config that can be left blank
-5. tfo (the file organizer) is now considered relatively stable though there might be exceptions that break the moving process. 
-    * Be forewarned that multiple files can be moved at once and will need tracking down. Any tfo processing
-	  should be done under supervision and not under a cron job until stable.
-
-*******************************************
-	FUTURE PLANS
-*******************************************
+Future Plans
+------------------
 
 * optionsgui
 * add better error messages 
-	* for wrong mysql password
 * Add a rename only config
 * add developer configurations
 
-*******************************************
-	KNOWN BUGS
-*******************************************
+Known Bugs
+----------------
 * [KINDA-FIXED] - On arch systems, ruby-gtk2 will not install properly. You will have to manually install it with
   "gem install gtk2"
 * After a while of using the gui, the program will quit itself because of memory usage. Just restart. The command
   line interface has no such problems
 
-*******************************************
-	CHANGELOG
-*******************************************
+Changelog
+----------------
+
+0.1.0
+* Migrated from mysql to sqlite3
+* Added support for multiple libaries
+* Filled up documentation better
 
 0.0.4-3
 * fixed scanning

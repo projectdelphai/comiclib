@@ -1,88 +1,41 @@
 #! /usr/bin/ruby
 
-require 'benchmark'
-require 'mysql'
 require 'highline/import'
 require 'yaml'
 require 'find'
 require 'fileutils'
 require 'optparse'
 require 'httparty'
+require 'sqlite3'
 
 @time = Time.new.strftime("%Y-%m-%d %H:%M:%S")
 trap("INT") do
 	exit 0
 end
 
-def firstrun
-	
-	
-	@@rootmysqlpass = ask("Enter your root password:  " ) { |q| q.echo = "*" }
-	mypass = ask("Enter your user password:  " ) { |q| q.echo = "*" }
-	con0 = Mysql.new 'localhost', "root", "#{@@rootmysqlpass}"
-	con0.query("CREATE DATABASE IF NOT EXISTS comics;")
-	con0.query("GRANT ALL ON COMICS.* to #{@options[:"mysqluser"]}@localhost IDENTIFIED BY '#{mypass}';")
-
-begin
-
-	titles=`find "#{@options[:"comicsdir"]}/" -type f | sed 's,#{@options[:"comicsdir"]}/,,'`
-	titles=titles.split(/\n/)
-	paths=`find "#{@options[:"comicsdir"]}/" -type f`
-	paths=paths.split(/\n/)
-	
-
-    con = Mysql.new 'localhost', "#{@options[:"mysqluser"]}", "#{mypass}", 'comics'
-
-	con.query("DROP TABLE IF EXISTS Titles")
-    con.query("CREATE TABLE IF NOT EXISTS \
-       Titles(ID INT PRIMARY KEY AUTO_INCREMENT, Name VARCHAR(100), Path VARCHAR(200), MarkAsRead VARCHAR(100))")
-	
-	titles.zip(paths).each { |title, path|
-		con.query("INSERT INTO Titles(Name, Path, MarkAsRead) VALUES('#{title}', '#{path}', 'No')")
-	}
-	
-
-	rescue Mysql::Error => e
-    puts e.errno
-    puts e.error
-    
-	ensure
-    con.close if con
-	end
-end
-
-
-@options = {
-	:comicsdir => nil,
-	:origdir => nil,
-	:mysqluser => nil,
-	:mysqlpass => nil,
-}
-
 @yml = File.join(ENV['HOME'],'/.comiclib/comiclib.yml')
-if File.directory?("#{Dir.home}/.comiclib/")
-	nil
-else
-	Dir.mkdir("#{Dir.home}/.comiclib/", 0700)
-end
+Dir.mkdir("#{Dir.home}/.comiclib/", 0700) if File.directory?("#{Dir.home}/.comiclib/") == false
 
 if File.exists? "#{Dir.home}/.comiclib/comiclib.yml"
-	config_options = YAML::load_file(@yml)
-	@options.merge!(config_options)
+  options = YAML::load_file(@yml)
 else
-	File.open(@yml, 'w') { |file| YAML::dump(@options,file) }
-	STDERR.puts "Initialized config file in #{@yml}, please update with correct information and restart."
+	STDERR.puts "Please create a yml file in #{@yml}, update with correct information and restart."
 	exit 0;
 end
 option_parser = OptionParser.new do |opts|
-	opts.on("--firstrun") do
-		firstrun
+	opts.on("-d DATABASE") do |db|
+	  options[:database] = db
 	end
 	opts.on("-p PASSWORD") do |password|
 		@options[:mysqlpass] = password
 	end
 end
 option_parser.parse!
+
+options[:database] = 'main' if options[:database] == nil
+@options = { :comicsdir => nil, :origdir => nil, :database => options[:database] }
+@options[:comicsdir] = options[options[:database]][:comicsdir]
+@options[:origdir] = options[options[:database]][:origdir]
 
 def comiclist
 findcomics=`find #{@options[:"origdir"]}/ -maxdepth 1  -type f| sed 's,#{@options[:"origdir"]}/,,' | sort`
@@ -121,7 +74,6 @@ def comicsfilter
 @comicsti = Marshal.load( Marshal.dump(@comics) )
 @comictitles=@comics.collect { |x| 	x.split(/(?<=[a-zA-Z]).(?=[0-9])/)[0] }
 
-
 end
 
 def matchcomics
@@ -156,9 +108,10 @@ def matchfilter
 
 
 @matchesti.each { |x|
-	if x.include? "_" or x.include? "-"
+	if x.include? "_" or x.include? "-" or x.include? ":"
 		x.gsub!("_", " ")
 		x.gsub!("-", " ")
+		x.gsub!(":", "")
 	else
 	nil
 	end
@@ -236,60 +189,33 @@ main
 end
 
 def addcomics
-begin
-	titles=`find "#{@options[:"comicsdir"]}/" -name *.cb* -type f | sed 's,#{@options[:"comicsdir"]}/,,'`
-	titles=titles.split(/\n/)
-	paths=`find "#{@options[:"comicsdir"]}/" -name *.cb* -type f`
-	paths=paths.split(/\n/)
-
-    con = Mysql.new 'localhost', "#{@options[:"mysqluser"]}", "#{@options[:"mysqlpass"]}", 'comics'
-
-	titles.zip(paths).each { |titles, x|
-		match = con.query("SELECT Path From Titles WHERE Path='#{x}'")
-		
-		if match.num_rows == 0
-			con.query("INSERT INTO Titles(Name, Path, MarkAsRead) VALUES('#{titles}', '#{x}', 'No')")
-		else 
-		next
-		end		
-	}
-	
-rescue Mysql::Error => e
-    puts e.errno
-    puts e.error
+  titles=`find "#{@options[:"comicsdir"]}/" -name *.cb* -type f | sed 's,#{@options[:"comicsdir"]}/,,'`
+  titles=titles.split(/\n/)
+  paths=`find "#{@options[:"comicsdir"]}/" -name *.cb* -type f`
+  paths=paths.split(/\n/)
+  
+  db = SQLite3::Database.new "#{Dir.home}/.comiclib/#{@options[:database]}.db"
+  db.execute "CREATE TABLE IF NOT EXISTS Titles(ID INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT, Path TEXT, MarkAsRead TEXT)"
+  
+  titles.zip(paths).each { |titles, x|
+    match = db.execute("SELECT Path From Titles WHERE Path='#{x}'")
     
-ensure
-    con.close if con
-end
-tfrmenu
-end
-
-def startup
-	puts `clear`
-	test = "fail"
-	
-	until test == "pass" do 
-	passtest = ask("Enter your user password:  " ) { |q| q.echo = "*" } if @options[:"mysqlpass"] == nil
-	begin
-	con = Mysql.new 'localhost', "#{@options[:"mysqluser"]}", "#{passtest}", 'comics'
-	test = "pass"
-	@options[:"mysqlpass"] = passtest
-	rescue
-	  puts "fail"
-	  exit 0
-	end
-	end
-	addcomics
+    if match.size == 0
+      db.execute("INSERT INTO Titles(Name, Path, MarkAsRead) VALUES('#{titles}', '#{x}', 'No')")
+    else 
+      next
+    end		
+  }
+  tfrmenu
 end
 
 def markasread(id)
-
-con = Mysql.new 'localhost', "#{@options[:"mysqluser"]}", "#{@options[:"mysqlpass"]}", 'comics'
+db = SQLite3::Database.new "#{Dir.home}/.comiclib/#{@options[:database]}.db"
 
 puts "Mark As Read? Y/N"
 input = gets.chomp
 if input == "Y"
-query = con.query("UPDATE Titles SET MarkAsRead = 'Yes' WHERE ID = #{id} ")
+query = db.execute("UPDATE Titles SET MarkAsRead = 'Yes' WHERE ID = #{id} ")
 elsif input == "N"
 nil
 else
@@ -304,21 +230,21 @@ id = gets.chomp
 if id == "b"
 tfrmenu
 else
-con = Mysql.new 'localhost', "#{@options[:"mysqluser"]}", "#{@options[:"mysqlpass"]}", 'comics'
+db = SQLite3::Database.new "#{Dir.home}/.comiclib/#{@options[:database]}.db"
 
-t1 = con.query("SELECT Path FROM Titles WHERE ID IN (#{id})")
-t1.each_hash do |row|
-	row=row.to_s.gsub!( "{\"Path\"=>", "").gsub!( "}", "")
-	`rc #{row} 2> /dev/null`
+t1 = db.execute("SELECT Path FROM Titles WHERE ID IN (#{id})")
+t1.each do |row|
+  row=row.to_s.gsub!( "[", "").gsub!( "]", "")
+  `rc #{row} 2> /dev/null`
 end
-t2 = con.query("SELECT MarkAsRead FROM Titles WHERE ID IN (#{id})")
-t2.each_hash do |row|
-	row=row.to_s.gsub!( "{\"MarkAsRead\"=>\"", "").gsub!( "\"}", "")
-	if row == "No"
-	markasread(id)
-	else
-	nil
-	end
+t2 = db.execute("SELECT MarkAsRead FROM Titles WHERE ID IN (#{id})")
+t2.each do |row|
+  row=row.to_s.gsub!( "[\"", "").gsub!( "\"]", "")
+  if row == "No"
+    markasread(id)
+  else
+    nil
+  end
 end
 sleep 2
 tfrmenu
@@ -326,126 +252,128 @@ end
 end
 
 def searchcomic
-con = Mysql.new 'localhost', "#{@options[:"mysqluser"]}", "#{@options[:"mysqlpass"]}", 'comics'
-`clear`
-puts "What comic do you want to read?"
-comicsearch = gets.chomp
-if comicsearch == "b"
-tfrmenu
-else
-searchquery = con.query("SELECT * FROM Titles WHERE Name LIKE '%#{comicsearch}%' ")
-matches=[]
-searchquery.each_hash { |row|
-	matches.push row['ID'] + " " + row['Name']
-}
-puts matches
-readcomic
-end
+  db = SQLite3::Database.new "#{Dir.home}/.comiclib/#{@options[:database]}.db"
+  `clear`
+  puts "What comic do you want to read?"
+  comicsearch = gets.chomp
+  if comicsearch == "b"
+    tfrmenu
+  else
+    searchquery = db.execute("SELECT * FROM Titles WHERE Name LIKE '%#{comicsearch}%' ")
+    matches=[]
+    searchquery.each { |row|
+      matches.push "#{row[0]} #{row[1]}"
+    }
+    puts matches
+    readcomic
+  end
 end
 
 def displayunreadcomics
-	con = Mysql.new 'localhost', "#{@options[:"mysqluser"]}", "#{@options[:"mysqlpass"]}", 'comics'
-	
-	comics = con.query("SELECT ID, Name FROM Titles WHERE MarkAsRead='No' ORDER BY Name ASC")
-	
-	matches=[]
-	comics.each_hash { |row|
-		matches.push row['ID'] + " " + row['Name']
-	}
-	puts matches
-	readcomic
+  db = SQLite3::Database.new "#{Dir.home}/.comiclib/#{@options[:database]}.db"
+  
+  comics = db.execute("SELECT ID, Name FROM Titles WHERE MarkAsRead='No' ORDER BY Name ASC")
+  
+  matches=[]
+  comics.each { |row|
+    matches.push "#{row[0]} #{row[1]}"
+  }
+  puts matches
+  readcomic
 end
 
 def deletecomic
-	con = Mysql.new 'localhost', "#{@options[:"mysqluser"]}", "#{@options[:"mysqlpass"]}", 'comics'
-	`clear`
-	puts "What comic do you want to remove from library?"
-	comicsearch = gets.chomp
-	if comicsearch == "b"
-	tfrmenu
-	else
-	searchquery = con.query("SELECT * FROM Titles WHERE Name LIKE '%#{comicsearch}%' ")
-	matches=[]
-	searchquery.each_hash { |row|
-		matches.push row['ID'] + " " + row['Name']
-	}
-	puts matches
-	puts  "Which comic do you want to remove?"
-	id = gets.chomp
-	confirm = ask("WARNING: This will remove the file as well. Continue? Y/N")
-	if confirm.chomp == "Y"
-		path = con.query("SELECT Path FROM Titles WHERE ID='#{id}'")
-		path.each { |x|
-			puts `rm "#{x.to_s.gsub!("[\"", "").gsub!("\"]", "")}"`
-			File.open("#{Dir.home}/.comiclib/comiclib.log", "a") { |f| f.write("[#{@time}] tfr: Removed from Library - #{x}") }
-		}
-		con.query("DELETE FROM Titles WHERE ID='#{id}'")
-		puts "comic deleted"
-		sleep 5
-	else
-	nil
-	end
-	tfrmenu
-	end
+  db = SQLite3::Database.new "#{Dir.home}/.comiclib/#{@options[:database]}.db"
+  `clear`
+  puts "What comic do you want to remove from library?"
+  comicsearch = gets.chomp
+  if comicsearch == "b"
+    tfrmenu
+  else
+    searchquery = db.execute("SELECT * FROM Titles WHERE Name LIKE '%#{comicsearch}%' ")
+    matches=[]
+    searchquery.each { |row|
+      matches.push "#{row[0]} #{row[1]}"
+    }
+    puts matches
+    puts  "Which comic do you want to remove?"
+    id = gets.chomp
+    confirm = ask("WARNING: This will remove the file as well. Continue? Y/N")
+    if confirm.chomp == "Y"
+      path = db.execute("SELECT Path FROM Titles WHERE ID='#{id}'")
+      path.each { |x|
+	puts `rm "#{x.to_s.gsub!("[\"", "").gsub!("\"]", "")}"`
+	File.open("#{Dir.home}/.comiclib/comiclib.log", "a") { |f| f.write("[#{@time}] tfr: Removed from Library - #{x}") }
+      }
+      db.execute("DELETE FROM Titles WHERE ID='#{id}'")
+      puts "comic deleted"
+      sleep 5
+    else
+      nil
+    end
+    tfrmenu
+  end
 end
 
 def cleanlibrary
-	titles=`find "#{@options[:"comicsdir"]}/" -name *.cb* -type f | sed 's,#{@options[:"comicsdir"]}/,,'`
-	titles=titles.split(/\n/)
-	
-	con = Mysql.new 'localhost', "#{@options[:"mysqluser"]}", "#{@options[:"mysqlpass"]}", 'comics'
-	
-	comics = con.query("SELECT Name FROM Titles")
-	comictitles=[]
-	comics.each { |x|
-		comictitles.push x.to_s.gsub!("[\"", "").gsub!("\"]", "")
-	}
-	
-	a = titles
-	b = comictitles
-	nomatches = (a | b) - (a & b)
-	nomatches.each { |x|
-		puts "#{x} - CLEANED"
-		File.open("#{Dir.home}/.comiclib/comiclib.log", "a") { |f| f.write("[#{@time}] tfr: Removed from Library - #{x}") }
-		con.query("DELETE FROM Titles WHERE Name='#{x}'")		
-	}
-	puts "#{nomatches.size} ITEMS WERE REMOVED LIBRARY"
-	puts "Alphabetizing Entries. . ."
-	con.query("CREATE TABLE Titles2 (SELECT * FROM Titles ORDER BY Name)")
-	con.query("DROP TABLE Titles;")
-	con.query("RENAME TABLE Titles2 TO Titles")
-	puts "Reordering IDs. . ."
-	con.query("ALTER TABLE Titles DROP COLUMN ID")
-	con.query("ALTER TABLE Titles ADD COLUMN ID INTEGER AUTO_INCREMENT PRIMARY KEY FIRST")
-	emptyfolders = `find #{@options[:"comicsdir"]} -type d -empty`.split(/\n/)
-	emptyfolders.each { |x|
-		puts `rmdir "#{x}"`
-		puts "Removed empty folder: #{x}"
-	}
-	comics2 = con.query("SELECT Path FROM Titles WHERE MarkAsRead='No'")
-	unread=[]
-	comics2.each { |x|
-		unread.push x.to_s.gsub!("[\"", "").gsub!("\"]", "")
-	}
-	jpgs=[]
-	unread.each { |x|
-		jpgs.push x if x.end_with?('.jpg')		
-	}
-	if jpgs.size >= 1
-		jpgs.each { |x|
-			con.query("DELETE FROM Titles WHERE Path='#{x}'")
-		}
-	else
-	nil
-	end
-	puts "Library cleaned"
-	sleep 4
-	tfrmenu	
+  titles=`find "#{@options[:"comicsdir"]}/" -name *.cb* -type f | sed 's,#{@options[:"comicsdir"]}/,,'`
+  titles=titles.split(/\n/)
+
+  db = SQLite3::Database.new "#{Dir.home}/.comiclib/#{@options[:database]}.db"
+  
+  comics = db.execute("SELECT Name FROM Titles")
+  comictitles=[]
+  comics.each { |x|
+    comictitles.push x.to_s.gsub!("[\"", "").gsub!("\"]", "")
+  }
+  
+  a = titles
+  b = comictitles
+  nomatches = (a | b) - (a & b)
+  nomatches.each { |x|
+    puts "#{x} - CLEANED"
+    File.open("#{Dir.home}/.comiclib/comiclib.log", "a") { |f| f.write("[#{@time}] tfr: Removed from Library - #{x}") }
+    db.execute("DELETE FROM Titles WHERE Name='#{x}'")		
+  }
+  puts "#{nomatches.size} ITEMS WERE REMOVED LIBRARY"
+  puts "Alphabetizing Entries. . ."
+  db.execute("CREATE TABLE Titles2 AS SELECT * FROM Titles ORDER BY Name")
+  db.execute("DROP TABLE Titles;")
+  db.execute("ALTER TABLE Titles2 RENAME TO Titles")
+  puts "Reordering IDs. . ."
+  db.execute("CREATE TABLE Titles2(ID INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT, Path TEXT, MarkAsRead TEXT)")
+  db.execute("INSERT INTO Titles2(Name,Path,MarkAsRead) SELECT Name,Path,MarkAsRead FROM Titles")
+  db.execute("DROP TABLE Titles;")
+  db.execute("ALTER TABLE Titles2 RENAME TO Titles")  
+  emptyfolders = `find #{@options[:"comicsdir"]} -type d -empty`.split(/\n/)
+  emptyfolders.each { |x|
+    puts `rmdir "#{x}"`
+    puts "Removed empty folder: #{x}"
+  }
+  comics2 = db.execute("SELECT Path FROM Titles WHERE MarkAsRead='No'")
+  unread=[]
+  comics2.each { |x|
+    unread.push x.to_s.gsub!("[\"", "").gsub!("\"]", "")
+  }
+  jpgs=[]
+  unread.each { |x|
+    jpgs.push x if x.end_with?('.jpg')		
+  }
+  if jpgs.size >= 1
+    jpgs.each { |x|
+      db.execute("DELETE FROM Titles WHERE Path='#{x}'")
+    }
+  else
+    nil
+  end
+  puts "Library cleaned"
+  sleep 4
+  tfrmenu	
 end
 
 def tfrmenu
 	puts `clear`
-	puts "Please pick an option\n1. Read Unread Comics \n2. Read Comic \n3. Delete Comic \n4. Scan Comics \n5. Clean Library"
+	puts "Please pick an option\n1. Read Unread Comics \n2. Read/Search Comics \n3. Delete Comic \n4. Scan Comics \n5. Clean Library"
 	case gets.strip
 	when "1"
 	displayunreadcomics
@@ -465,7 +393,8 @@ def tfrmenu
 end
 
 def tfr
-startup
+#startup
+addcomics
 end
 
 def coverart(nc)
@@ -473,6 +402,7 @@ jpgsfull=[]
 	jpgs=[]
 	nc.each { |x|
 		if x.end_with?('.cbr')
+
 			jpgsfull.push `unrar vb "#{x}" 2> /dev/null | sort | grep .jpg | head -n 1`
 			jpgs.push `unrar lb "#{x}" 2> /dev/null | sort | grep .jpg | head -n 1`
 		elsif x.end_with?('.cbz')
@@ -498,19 +428,20 @@ jpgsfull=[]
 	}
 end
 
-def matches(user,password)
-	con = Mysql.new 'localhost', "#{user}", "#{password}", 'comics'
-	
-	comics = con.query("SELECT Path FROM Titles WHERE MarkAsRead='No' ORDER BY Name ASC")
-	
-	matches=[]
-	comics.each_hash { |row|
-		matches.push row['Path']
-	}
-	return matches
+def matchesmethod
+  db = SQLite3::Database.new "#{Dir.home}/.comiclib/#{@options[:database]}.db"
+  
+  comics = db.execute("SELECT Path FROM Titles WHERE MarkAsRead='No' ORDER BY Name ASC")
+  
+  matches=[]
+  comics.each { |row|
+    row = row.to_s.gsub!("[\"", "").gsub!("\"]", "")
+    matches.push row
+  }
+  return matches
 end
 
-def drawcomics(i,c,images,matches,comicsdir,password,user)
+def drawcomics(i,c,images,matches,comicsdir)
 background black
 y=i
 i.upto(i+5) { |x|
@@ -530,7 +461,7 @@ i.upto(i+5) { |x|
 				elsif y.inspect.to_i == 3
 					path = matches[x]
 					cover = images[x]
-					infogui(i,c,images,matches,path,cover,comicsdir,password,user)
+					infogui(i,c,images,matches,path,cover,comicsdir)
 				else nil
 				end
 			end
@@ -540,8 +471,8 @@ i.upto(i+5) { |x|
 GC.start
 end
 
-def reload(i,c,matches,comicsdir,user,password)
-matches = matches(user,password)
+def reload(i,c,matches,comicsdir)
+matches = matches
 images=[]
 matches.each { |x|
 	if x.end_with?('.cbr')
@@ -552,11 +483,11 @@ matches.each { |x|
 	nil
 	end
 }
-@flow.clear { drawcomics(i,c,images,matches,comicsdir,password,user) }
+@flow.clear { drawcomics(i,c,images,matches,comicsdir) }
 return matches;
 end
 
-def infogui(i,c,images,matches,path,cover,comicsdir,password,user)
+def infogui(i,c,images,matches,path,cover,comicsdir)
 	Shoes.app :width => 642, :height => 487, :title => "Info" do 
 		stack do
 			tagline path.gsub(/^#{comicsdir.gsub('/', '\/')}\/[a-zA-Z\s\S]*\//, ''), align: 'center', margin_top: 15
@@ -571,9 +502,9 @@ def infogui(i,c,images,matches,path,cover,comicsdir,password,user)
 			flow do			
 				@mar = button "Mark As Read", margin_top: 40, margin_left: 15
 				@mar.click do
-					con = Mysql.new 'localhost', "#{user}", "#{password}", 'comics'
-					
-					con.query("UPDATE Titles SET MarkAsRead = 'Yes' WHERE Path='#{path}' ")
+				  db = SQLite3::Database.new "#{Dir.home}/.comiclib/#{@options[:database]}.db"
+				  
+				  db.execute("UPDATE Titles SET MarkAsRead = 'Yes' WHERE Path='#{path}' ")
 				end
 				button("Close", margin_top: 40, margin_left: 10){close}
 				
@@ -621,97 +552,77 @@ end
 def maingui
 
 require 'green_shoes'
-	
-	test = "fail"
-	until test == "pass" do
 
-	passtest = ask("Please enter password:", :secret => true)
-	
-	if passtest == nil
-	exit 0;	
-	else nil
+  comicsdir = @options[:"comicsdir"]
+  
+  matches = matchesmethod
+  
+  nc=[]
+  matches.each { |x|
+    if File.exists?(x.gsub(/.cb./, '.jpg'))
+      nil
+    else
+      nc.push x
+    end
+    x = nil
+  }
+  coverart(nc) if nc.size >= 1	
+  images=[]
+  matches.each { |x|
+    if x.end_with?('.cbr')
+      images.push x.gsub('.cbr', '.jpg')
+    elsif x.end_with?('.cbz')
+      images.push x.gsub('.cbz', '.jpg')
+    else
+      nil
+    end
+    x = nil
+  }
+  Shoes.app :title => "comiclib" do
+    background black
+    @flow = flow do
+      background black
+      i=0
+      c=0
+      drawcomics(i,c,images,matches,comicsdir)
+      keypress do |k|
+	if k == "q"
+	  exit
+	elsif k == "n"
+	  i+=6 unless i+1 == images.size
+	  c=i 
+	  reload(i,c,matches,comicsdir)
+	elsif k == "p"
+	  i-=6 unless i<=0
+	  c=i 
+	  reload(i,c,matches,comicsdir)
+	elsif k == "Right" or k == "k"
+	  c+=1 unless c>=i+5
+	  reload(i,c,matches,comicsdir)
+	elsif k == "Left" or k == "j"
+	  c-=1 unless c<=i
+	  reload(i,c,matches,comicsdir)
+	elsif k == "i"
+	  path=matches[c]
+	  cover=images[c]
+	  infogui(i,c,images,matches,path,cover,comicsdir)
+	elsif k == "o"
+	  optionsgui
+	elsif k == "r"
+	  reload(i,c,matches,comicsdir)
+	elsif k == "\n"
+	  
+	  matches = reload(i,c,matches,comicsdir)
+	  puts `rc "#{matches[c]}" 1> /dev/null`
+	  GC.start
+	else
+	  nil
 	end
-	begin
-	con = Mysql.new 'localhost', "#{@options[:"mysqluser"]}", "#{passtest}", 'comics'
-	test = "pass"
-	@options[:"mysqlpass"] = passtest
-	rescue
-	alert("Wrong Password, try again")
-	end
-
-	end
-
-	comicsdir = @options[:"comicsdir"]
-	password = @options[:"mysqlpass"]
-	user = @options[:"mysqluser"]
-	
-	matches = matches(user,password)
-	
-	nc=[]
-	matches.each { |x|
-		if File.exists?(x.gsub(/.cb./, '.jpg'))
-		nil
-		else
-		nc.push x
-		end
-		x = nil
-	}
-	coverart(nc) if nc.size >= 1	
-	images=[]
-	matches.each { |x|
-		if x.end_with?('.cbr')
-		images.push x.gsub('.cbr', '.jpg')
-		elsif x.end_with?('.cbz')
-		images.push x.gsub('.cbz', '.jpg')
-		else
-		nil
-		end
-		x = nil
-	}
-	Shoes.app :title => "comiclib" do
-		background black
-		@flow = flow do
-		background black
-			i=0
-			c=0
-			drawcomics(i,c,images,matches,comicsdir,password,user)
-			keypress do |k|
-				if k == "q"
-					exit
-				elsif k == "n"
-				i+=6 unless i+1 == images.size
-				c=i 
-				reload(i,c,matches,comicsdir,user,password)
-				elsif k == "p"
-				i-=6 unless i<=0
-				c=i 
-				reload(i,c,matches,comicsdir,user,password)
-				elsif k == "Right" or k == "k"
-				c+=1 unless c>=i+5
-				reload(i,c,matches,comicsdir,user,password)
-				elsif k == "Left" or k == "j"
-				c-=1 unless c<=i
-				reload(i,c,matches,comicsdir,user,password)
-				elsif k == "i"
-				path=matches[c]
-				cover=images[c]
-				infogui(i,c,images,matches,path,cover,comicsdir,password,user)
-				elsif k == "o"
-				optionsgui
-				elsif k == "r"
-				reload(i,c,matches,comicsdir,user,password)
-				elsif k == "\n"
-				matches = reload(i,c,matches,comicsdir,user,password)
-				puts `rc "#{matches[c]}" 1> /dev/null`
-				GC.start
-				else
-				nil
-				end
-			end			
-		end
-		GC.start
-	end
-	GC.start
+      end			
+    end
+    GC.start
+  end
+  GC.start
 end
 
 def main
