@@ -20,14 +20,24 @@ Setup
 2. When first run, ~/.comiclib and ~/.comiclib/config.yml is created. The config file should be filled out first.
 3. comiclib defaults to a main.db where the main library information is held. To create/use a new/different library specify it with -d <database name>. A new database file will be created at ~/.comiclib/<databasename>.db
 4. Config File Sample
+
 	---
+
 	main:
+
 	  :comicsdir: /path/to/all/comics
+
 	  :origdir: /path/to/unsorted/comics
+
 	
+
 	secondlibrary:
+
 	  :comicsdir: /same/thing/note/the
+
 	  :origdir: /lack/of/ending/slash
+
+
 5. The file organizer is relatively stable but should be used with caution just in case
 
 Future Plans
