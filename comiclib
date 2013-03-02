@@ -428,8 +428,8 @@ jpgsfull=[]
 	}
 end
 
-def matchesmethod
-  db = SQLite3::Database.new "#{Dir.home}/.comiclib/#{@options[:database]}.db"
+def matchesmethod(database)
+  db = SQLite3::Database.new "#{Dir.home}/.comiclib/#{database}.db"
   
   comics = db.execute("SELECT Path FROM Titles WHERE MarkAsRead='No' ORDER BY Name ASC")
   
@@ -441,38 +441,41 @@ def matchesmethod
   return matches
 end
 
-def drawcomics(i,c,images,matches,comicsdir)
-background black
-y=i
-i.upto(i+5) { |x|
-	if images[x] == nil
-	nil
-	else
-		flow :width => 415 do
-		border white, :strokewidth => 1 if x == c unless c > y+5
-		
-			image = image images[x], width: 384, height: 590, margin: 15
-			
-			image.click do |y|
-				if y.inspect.to_i == 1
-					puts `rc "#{matches[x]}" 1> /dev/null`
-				elsif y.inspect.to_i == 2
-					puts "middle-click"
-				elsif y.inspect.to_i == 3
-					path = matches[x]
-					cover = images[x]
-					infogui(i,c,images,matches,path,cover,comicsdir)
-				else nil
-				end
-			end
-		end
+def drawcomics(i,c,images,matches,comicsdir,database)
+  background black
+  y=i
+  i.upto(i+5) { |x|
+    if images[x] == nil
+      nil
+    else
+      flow :width => 415 do
+	border white, :strokewidth => 1 if x == c unless c > y+5
+	
+	image = image images[x], width: 384, height: 590, margin: 15
+	
+	image.click do |y|
+	  if y.inspect.to_i == 1
+	    puts `rc "#{matches[x]}" 1> /dev/null`
+	  elsif y.inspect.to_i == 2
+	    path = matches[x]
+  	    db = SQLite3::Database.new "#{Dir.home}/.comiclib/#{database}.db"
+  	    db.execute("UPDATE Titles SET MarkAsRead='Yes' WHERE Path='#{path}' ")
+	    reload(i,c,matches,comicsdir,database)
+	  elsif y.inspect.to_i == 3
+	    path = matches[x]
+	    cover = images[x]
+	    infogui(i,c,images,matches,path,cover,comicsdir,database)
+	  else nil
+	  end
 	end
-}
-GC.start
+      end
+    end
+  }
+  GC.start
 end
 
-def reload(i,c,matches,comicsdir)
-matches = matches
+def reload(i,c,matches,comicsdir,database)
+matches = matchesmethod(database)
 images=[]
 matches.each { |x|
 	if x.end_with?('.cbr')
@@ -483,50 +486,48 @@ matches.each { |x|
 	nil
 	end
 }
-@flow.clear { drawcomics(i,c,images,matches,comicsdir) }
+@flow.clear { drawcomics(i,c,images,matches,comicsdir,database) }
 return matches;
 end
 
-def infogui(i,c,images,matches,path,cover,comicsdir)
-	Shoes.app :width => 642, :height => 487, :title => "Info" do 
-		stack do
-			tagline path.gsub(/^#{comicsdir.gsub('/', '\/')}\/[a-zA-Z\s\S]*\//, ''), align: 'center', margin_top: 15
-		end
-		stack :width => 245 do
-			flow :width => 245 do
-			
-				image = image cover, top: '15', width: 230.4, height: 354, margin_top: 40, margin_left: 15
-			end
-		end
-		stack :width => 375 do
-			flow do			
-				@mar = button "Mark As Read", margin_top: 40, margin_left: 15
-				@mar.click do
-				  db = SQLite3::Database.new "#{Dir.home}/.comiclib/#{@options[:database]}.db"
-				  
-				  db.execute("UPDATE Titles SET MarkAsRead = 'Yes' WHERE Path='#{path}' ")
-				end
-				button("Close", margin_top: 40, margin_left: 10){close}
-				
-			end
-			flow do
-				title = path.gsub(/#{comicsdir}\/[a-zA-Z0-9\s\-]*\//, '').gsub!(/.cb./, '')
-				title = title.gsub('0', '')
-				title = title.gsub('#', '')
-				title = title.gsub('  ', ' ')
-				title = title.gsub(' ', '+')
-				urls = HTTParty.get("http://api.comicvine.com/search/?api_key=86105e0ab26cf7a2f329056bb027c5ca83095807&resources=issue&query=#{title}&format=json")
-				begin	
-				summary = urls.body.match(/<p><i>([\w\s\-'!?.,#]*)<\/i>/)[1]
-				para "#{summary}", margin_top: 15, margin_left: 15
-				rescue
-				para "Could not find summary", margin_top: 15, margin_left: 15	
-				end
-				para "Thanks to both the comicvine editors and the staff for the plot summary and for the comicvine api", margin_top: 30, margin_left: 15
-			end				
-		end
+def infogui(i,c,images,matches,path,cover,comicsdir,database)
+  Shoes.app :width => 642, :height => 487, :title => "Info" do 
+    stack do
+      tagline path.gsub(/^#{comicsdir.gsub('/', '\/')}\/[a-zA-Z\s\S]*\//, ''), align: 'center', margin_top: 15
+    end
+    stack :width => 245 do
+      flow :width => 245 do
+	
+	image = image cover, top: '15', width: 230.4, height: 354, margin_top: 40, margin_left: 15
+      end
+    end
+    stack :width => 375 do
+      flow do			
+	@mar = button "Mark As Read", margin_top: 40, margin_left: 15
+	@mar.click do
+	  db = SQLite3::Database.new "#{Dir.home}/.comiclib/#{database}.db"
+	  db.execute("UPDATE Titles SET MarkAsRead='Yes' WHERE Path='#{path}' ")
+	  end
+	button("Close", margin_top: 40, margin_left: 10){close}
+      end
+      flow do
+	title = path.gsub(/#{comicsdir}\/[a-zA-Z0-9\s\-]*\//, '').gsub!(/.cb./, '')
+	  title = title.gsub('0', '')
+	title = title.gsub('#', '')
+	title = title.gsub('  ', ' ')
+	title = title.gsub(' ', '+')
+	urls = HTTParty.get("http://api.comicvine.com/search/?api_key=86105e0ab26cf7a2f329056bb027c5ca83095807&resources=issue&query=#{title}&format=json")
+	begin	
+	  summary = urls.body.match(/<p><i>([\w\s\-'!?.,#]*)<\/i>/)[1]
+	    para "#{summary}", margin_top: 15, margin_left: 15
+	rescue
+	  para "Could not find summary", margin_top: 15, margin_left: 15	
 	end
-	GC.start
+	para "Thanks to both the comicvine editors and the staff for the plot summary and for the comicvine api", margin_top: 30, margin_left: 15
+      end				
+    end
+  end
+  GC.start
 end
 
 def optionsgui
@@ -554,8 +555,9 @@ def maingui
 require 'green_shoes'
 
   comicsdir = @options[:"comicsdir"]
+  database = @options[:database]
   
-  matches = matchesmethod
+  matches = matchesmethod(database)
   
   nc=[]
   matches.each { |x|
@@ -584,35 +586,35 @@ require 'green_shoes'
       background black
       i=0
       c=0
-      drawcomics(i,c,images,matches,comicsdir)
+      drawcomics(i,c,images,matches,comicsdir,database)
       keypress do |k|
 	if k == "q"
 	  exit
 	elsif k == "n"
 	  i+=6 unless i+1 == images.size
 	  c=i 
-	  reload(i,c,matches,comicsdir)
+	  reload(i,c,matches,comicsdir,database)
 	elsif k == "p"
 	  i-=6 unless i<=0
 	  c=i 
-	  reload(i,c,matches,comicsdir)
+	  reload(i,c,matches,comicsdir,database)
 	elsif k == "Right" or k == "k"
 	  c+=1 unless c>=i+5
-	  reload(i,c,matches,comicsdir)
+	  reload(i,c,matches,comicsdir,database)
 	elsif k == "Left" or k == "j"
 	  c-=1 unless c<=i
-	  reload(i,c,matches,comicsdir)
+	  reload(i,c,matches,comicsdir,database)
 	elsif k == "i"
 	  path=matches[c]
 	  cover=images[c]
-	  infogui(i,c,images,matches,path,cover,comicsdir)
+	  infogui(i,c,images,matches,path,cover,comicsdir,database)
 	elsif k == "o"
 	  optionsgui
 	elsif k == "r"
-	  reload(i,c,matches,comicsdir)
+	  reload(i,c,matches,comicsdir,database)
 	elsif k == "\n"
 	  
-	  matches = reload(i,c,matches,comicsdir)
+	  matches = reload(i,c,matches,comicsdir,database)
 	  puts `rc "#{matches[c]}" 1> /dev/null`
 	  GC.start
 	else

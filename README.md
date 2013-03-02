@@ -22,6 +22,13 @@ Setup
 4. A sample config file can be seen [here](http://pastebin.com/nGcY96Cu)
 5. The file organizer is relatively stable but should be used with caution just in case
 
+Notes/Features
+--------------
+1. comiclib has a gui feature where you can read unread comics. To use it, use the command 'comiclib maingui <options>'
+2. In maingui, left-click reads the comics, right-click opens an information window, and middle-click marks it as read.
+3. Keyboard shortcuts: r = reload, i = information, n = next set, p = previous set, o = options, <Right> and <Left> = move to next/previous comic
+4. maingui is only for reading unread comics. To read already read comics, delete comics, clean library, or other features, use the command line.
+
 Future Plans
 ------------------
 
