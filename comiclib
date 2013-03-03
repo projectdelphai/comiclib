@@ -23,12 +23,22 @@ else
 	exit 0;
 end
 option_parser = OptionParser.new do |opts|
-	opts.on("-d DATABASE") do |db|
-	  options[:database] = db
-	end
-	opts.on("-p PASSWORD") do |password|
-		@options[:mysqlpass] = password
-	end
+  opts.banner = "\nUsage: comiclib [maingui] [options]"
+  
+  opts.separator ""
+  opts.separator "Options:"
+
+  opts.on("-d DATABASE", "--database DATABASE", "Use alternate database") do |db|
+    options[:database] = db
+  end
+  opts.on("-h", "--help", "Show this message") do
+    puts "#{opts}\n"
+    exit
+  end
+  opts.on("-v", "--version", "Show version number") do
+    puts "comiclib 0.1.1"
+    exit
+  end
 end
 option_parser.parse!
 
@@ -393,7 +403,6 @@ def tfrmenu
 end
 
 def tfr
-#startup
 addcomics
 end
 

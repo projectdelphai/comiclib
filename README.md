@@ -46,6 +46,10 @@ Known Bugs
 
 Changelog
 ----------------
+0.1.1
+* fixed markasread in info
+* added middle click as markasread
+* added more documentation
 
 0.1.0
 * Migrated from mysql to sqlite3
