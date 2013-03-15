@@ -50,6 +50,7 @@ Changelog
 * fixed markasread in info
 * added middle click as markasread
 * added more documentation
+* exit after command line tfo
 
 0.1.0
 * Migrated from mysql to sqlite3

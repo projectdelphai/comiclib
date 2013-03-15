@@ -164,7 +164,7 @@ end
 def foldercomics
 if Dir["#{@options[:"origdir"]}/*"].empty?
 	puts "No comics to be organize or renamed"
-	exit 0;
+	exit 0
 else nil end
 
 findcomics=`find #{@options[:"origdir"]}/ -maxdepth 2 -type f | sed -e "1d" | sed 's,#{@options[:"origdir"]}/,,' | sort`
@@ -195,7 +195,6 @@ createfolders
 matchcomics
 matchfilter
 movecomics
-main
 end
 
 def addcomics
@@ -645,6 +644,7 @@ def main
 	tfr
 	when "2"
 	tfo
+	main
 	end
 end	
 
